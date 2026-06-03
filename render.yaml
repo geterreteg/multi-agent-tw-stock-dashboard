@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: multi-agent-tw-stock-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: FINMIND_TOKEN
+        sync: false
