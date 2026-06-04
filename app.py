@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 
@@ -680,6 +681,11 @@ def apply_styles() -> None:
         .block-container { padding-top: 1.25rem; padding-bottom: 3rem; max-width: 1220px; }
         [data-testid="stSidebar"] { background: #0b1020; border-right: 1px solid var(--line); }
         [data-testid="stSidebar"] * { color: #e5eefb !important; }
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"] label {
+            font-size: 13px;
+            letter-spacing: 0;
+        }
         [data-testid="stSidebar"] input, [data-testid="stSidebar"] [role="combobox"] {
             background: #0f172a !important;
             border: 1px solid rgba(148, 163, 184, .35) !important;
@@ -690,7 +696,7 @@ def apply_styles() -> None:
             position: relative;
             overflow: hidden;
             border: 1px solid rgba(56, 189, 248, .32);
-            border-radius: 8px;
+            border-radius: 14px;
             padding: 30px;
             background:
                 linear-gradient(135deg, rgba(15,23,42,.96), rgba(12,48,70,.92)),
@@ -708,9 +714,10 @@ def apply_styles() -> None:
         }
         .value-card {
             border: 1px solid rgba(148, 163, 184, .28);
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 14px;
             background: rgba(15, 23, 42, .72);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
         }
         .value-card strong { display: block; color: #f8fafc; margin-bottom: 6px; }
         .value-card span { color: #a7b6cb; font-size: 13px; line-height: 1.55; }
@@ -729,7 +736,7 @@ def apply_styles() -> None:
         .section-kicker { color: #38bdf8; font-size: 13px; font-weight: 900; margin-bottom: 4px; }
         [data-testid="stMetric"] {
             border: 1px solid rgba(148, 163, 184, .24);
-            border-radius: 8px;
+            border-radius: 14px;
             padding: 15px 16px;
             background: linear-gradient(180deg, rgba(15,23,42,.95), rgba(15,23,42,.78));
             box-shadow: 0 12px 34px rgba(0,0,0,.18);
@@ -738,15 +745,71 @@ def apply_styles() -> None:
         [data-testid="stMetric"] * { color: #f8fafc !important; }
         [data-testid="stMetricLabel"] { color: #93c5fd !important; font-weight: 800; }
         [data-testid="stAlert"] {
-            border-radius: 8px;
+            border-radius: 12px;
             border: 1px solid rgba(148, 163, 184, .22);
+        }
+        [data-testid="stTabs"] button {
+            color: #cbd5e1 !important;
+            border-radius: 10px 10px 0 0;
+            font-weight: 800;
+        }
+        [data-testid="stTabs"] button[aria-selected="true"] {
+            color: #ffffff !important;
+            border-bottom-color: #38bdf8 !important;
+        }
+        [data-testid="stDataFrame"] {
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .chart-shell {
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(15, 23, 42, .9), rgba(2, 6, 23, .82));
+            padding: 12px 12px 2px;
+            box-shadow: 0 18px 44px rgba(0,0,0,.2);
+            margin-top: 8px;
+        }
+        .panel-note {
+            color: #93a4b8;
+            font-size: 13px;
+            line-height: 1.7;
+            margin: -4px 0 12px;
         }
         .agent-card {
             border: 1px solid rgba(148, 163, 184, .24);
-            border-radius: 8px;
+            border-radius: 14px;
             padding: 16px;
             background: rgba(15, 23, 42, .82);
             margin-bottom: 12px;
+            box-shadow: 0 14px 36px rgba(0,0,0,.16);
+        }
+        .flow-card {
+            border: 1px solid rgba(148, 163, 184, .22);
+            border-radius: 14px;
+            padding: 15px 16px;
+            background:
+                linear-gradient(180deg, rgba(15,23,42,.88), rgba(15,23,42,.66));
+            margin-bottom: 12px;
+            min-height: 116px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+        }
+        .flow-card .step {
+            color: #38bdf8;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .08em;
+        }
+        .flow-card h4 {
+            margin: 8px 0 6px;
+            color: #f8fafc;
+            font-size: 16px;
+        }
+        .flow-card p {
+            margin: 0;
+            color: #9fb0c7;
+            font-size: 13px;
+            line-height: 1.65;
         }
         .agent-card h4 { margin: 0 0 8px; color: #f8fafc; }
         .agent-card p { color: #cbd5e1; line-height: 1.7; margin: 6px 0; }
@@ -762,7 +825,7 @@ def apply_styles() -> None:
         }
         .chat-card {
             border: 1px solid rgba(148, 163, 184, .22);
-            border-radius: 8px;
+            border-radius: 14px;
             padding: 15px 16px;
             background: rgba(15, 23, 42, .82);
             margin-bottom: 12px;
@@ -774,9 +837,26 @@ def apply_styles() -> None:
         .chat-summary { border-left: 5px solid var(--green); }
         .report-box {
             border: 1px solid rgba(148, 163, 184, .24);
-            border-radius: 8px;
+            border-radius: 14px;
             background: rgba(15, 23, 42, .82);
             padding: 18px;
+        }
+        .decision-hero {
+            border: 1px solid rgba(56, 189, 248, .28);
+            border-radius: 14px;
+            padding: 18px 20px;
+            background: linear-gradient(135deg, rgba(14,165,233,.16), rgba(15,23,42,.82));
+            margin: 8px 0 16px;
+        }
+        .decision-hero span {
+            color: #93c5fd;
+            font-size: 13px;
+            font-weight: 900;
+        }
+        .decision-hero h3 {
+            margin: 5px 0 0;
+            color: #ffffff;
+            font-size: 24px;
         }
         @media (max-width: 900px) {
             .hero h1 { font-size: 32px; }
@@ -883,8 +963,49 @@ def price_chart_data(context: StockContext) -> pd.DataFrame:
     return data
 
 
+def apply_plotly_theme(fig: go.Figure, title: str, y_title: str = "") -> go.Figure:
+    fig.update_layout(
+        title={"text": title, "font": {"size": 18, "color": "#f8fafc"}},
+        template="plotly_dark",
+        height=430,
+        margin={"l": 28, "r": 18, "t": 54, "b": 34},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(2,6,23,0.45)",
+        font={"color": "#cbd5e1", "family": "Arial, sans-serif"},
+        hovermode="x unified",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+            "font": {"size": 12},
+        },
+        xaxis={
+            "showgrid": True,
+            "gridcolor": "rgba(148,163,184,0.12)",
+            "zeroline": False,
+            "rangeslider": {"visible": False},
+        },
+        yaxis={
+            "title": y_title,
+            "showgrid": True,
+            "gridcolor": "rgba(148,163,184,0.12)",
+            "zeroline": False,
+        },
+    )
+    return fig
+
+
+def render_plotly_chart(fig: go.Figure) -> None:
+    st.markdown('<div class="chart-shell">', unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_charts(context: StockContext) -> None:
     render_section_header("MARKET ANALYTICS", "市場圖表")
+    st.markdown('<p class="panel-note">以深色金融圖表呈現價格、成交量、均線與資料表，方便課堂 Demo 快速切換觀察重點。</p>', unsafe_allow_html=True)
     tabs = st.tabs(["股價走勢", "成交量", "均線分析", "法人籌碼", "基本面資料"])
     chart_data = price_chart_data(context)
 
@@ -892,13 +1013,34 @@ def render_charts(context: StockContext) -> None:
         if chart_data.empty or "Close" not in chart_data:
             st.warning("股價資料暫無，技術圖表已降級。")
         else:
-            st.line_chart(chart_data, x="日期", y="Close")
+            fig = go.Figure()
+            fig.add_trace(
+                go.Scatter(
+                    x=chart_data["日期"],
+                    y=pd.to_numeric(chart_data["Close"], errors="coerce"),
+                    mode="lines",
+                    name="收盤價",
+                    line={"color": "#38bdf8", "width": 2.4},
+                    fill="tozeroy",
+                    fillcolor="rgba(56,189,248,0.08)",
+                )
+            )
+            render_plotly_chart(apply_plotly_theme(fig, "股價走勢", "價格"))
 
     with tabs[1]:
         if chart_data.empty or "Volume" not in chart_data:
             st.warning("成交量資料暫無。")
         else:
-            st.bar_chart(chart_data, x="日期", y="Volume")
+            fig = go.Figure()
+            fig.add_trace(
+                go.Bar(
+                    x=chart_data["日期"],
+                    y=pd.to_numeric(chart_data["Volume"], errors="coerce"),
+                    name="成交量",
+                    marker={"color": "#34d399", "opacity": 0.76},
+                )
+            )
+            render_plotly_chart(apply_plotly_theme(fig, "成交量", "股數"))
 
     with tabs[2]:
         if chart_data.empty or "Close" not in chart_data:
@@ -908,7 +1050,11 @@ def render_charts(context: StockContext) -> None:
             close = pd.to_numeric(ma_data["Close"], errors="coerce")
             ma_data["MA20"] = close.rolling(20).mean()
             ma_data["MA60"] = close.rolling(60).mean()
-            st.line_chart(ma_data, x="日期", y=["Close", "MA20", "MA60"])
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=ma_data["日期"], y=close, mode="lines", name="收盤價", line={"color": "#e2e8f0", "width": 2}))
+            fig.add_trace(go.Scatter(x=ma_data["日期"], y=ma_data["MA20"], mode="lines", name="MA20", line={"color": "#38bdf8", "width": 2}))
+            fig.add_trace(go.Scatter(x=ma_data["日期"], y=ma_data["MA60"], mode="lines", name="MA60", line={"color": "#fbbf24", "width": 2}))
+            render_plotly_chart(apply_plotly_theme(fig, "均線分析", "價格"))
 
     with tabs[3]:
         chip_df = pd.DataFrame(
@@ -947,6 +1093,7 @@ def agent_specs(context: StockContext, agents: Dict[str, str], final_rating: str
 
 def render_agent_flow() -> None:
     render_section_header("AGENT PIPELINE", "多 Agent 分工流程")
+    st.markdown('<p class="panel-note">從資料整合到總結決策，每個 Agent 負責不同分析視角，讓老師能一眼看懂系統價值。</p>', unsafe_allow_html=True)
     steps = [
         ("01", "資料整合", "取得資料並檢查降級"),
         ("02", "技術分析", "判讀股價與均線"),
@@ -958,7 +1105,16 @@ def render_agent_flow() -> None:
     cols = st.columns(3)
     for index, (number, title, body) in enumerate(steps):
         with cols[index % 3]:
-            st.info(f"**{number}｜{title} Agent**\n\n{body}")
+            st.markdown(
+                f"""
+                <div class="flow-card">
+                    <div class="step">AGENT {number}</div>
+                    <h4>{title}</h4>
+                    <p>{body}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def render_agent_outputs(context: StockContext, agents: Dict[str, str], final_rating: str, decision: Dict[str, List[str]]) -> None:
@@ -997,6 +1153,15 @@ def render_debate(debate: List[Tuple[str, str, str]]) -> None:
 
 def render_decision(context: StockContext, final_rating: str, decision: Dict[str, List[str]], report: str) -> None:
     render_section_header("RESEARCH REPORT", "最終研究報告")
+    st.markdown(
+        f"""
+        <div class="decision-hero">
+            <span>{context.stock_id}｜{context.stock_name}｜規則式多 Agent 研究結論</span>
+            <h3>綜合評級：{final_rating}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     if final_rating == "偏多":
         st.success(f"綜合評級：{final_rating}")
     elif final_rating == "偏空":
