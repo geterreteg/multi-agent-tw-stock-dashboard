@@ -9,39 +9,47 @@ from app.services.market_data import fmt_number
 def technical_agent(context) -> AgentInsight:
     reasons: list[str] = []
     risks: list[str] = []
-    score = 0
+    score = 0.0
     available = 0
 
     if context.latest_close is not None and context.ma20 is not None:
         available += 1
-        if context.latest_close >= context.ma20:
-            score += 1
-            reasons.append("收盤價站上 MA20，短線價格結構偏強。")
-        else:
-            score -= 1
+        if context.latest_close > context.ma20:
+            score += 0.5
+            reasons.append("收盤價高於 MA20，短線價格結構偏強。")
+        elif context.latest_close < context.ma20:
+            score -= 0.5
             risks.append("收盤價跌破 MA20，短線動能偏弱。")
     else:
         risks.append("收盤價或 MA20 資料不足，技術面判斷降級。")
 
+    if context.latest_close is not None and context.ma60 is not None:
+        available += 1
+        if context.latest_close > context.ma60:
+            score += 0.5
+            reasons.append("收盤價高於 MA60，中期趨勢位置偏正向。")
+        elif context.latest_close < context.ma60:
+            score -= 0.5
+            risks.append("收盤價低於 MA60，中期趨勢位置偏弱。")
+
     if context.ma20 is not None and context.ma60 is not None:
         available += 1
-        if context.ma20 >= context.ma60:
-            score += 1
+        if context.ma20 > context.ma60:
+            score += 0.5
             reasons.append("MA20 高於 MA60，中期趨勢仍有支撐。")
-        else:
-            score -= 1
+        elif context.ma20 < context.ma60:
+            score -= 0.5
             risks.append("MA20 低於 MA60，中期趨勢偏弱。")
 
     if context.return_20d is not None:
         available += 1
-        if context.return_20d > 18:
-            score -= 1
-            risks.append("20 日報酬率過高，短線追價風險升高。")
-        elif context.return_20d > 5:
-            score += 1
+        if context.return_20d > 5:
+            score += 0.5
             reasons.append("20 日報酬率為正且具動能。")
+            if context.return_20d > 15:
+                risks.append("20 日報酬率高於 15%，需留意短線過熱風險。")
         elif context.return_20d < -5:
-            score -= 1
+            score -= 0.5
             risks.append("20 日報酬率明顯轉弱。")
 
     if context.average_volume is not None and context.average_volume < 1_000_000:
@@ -53,6 +61,7 @@ def technical_agent(context) -> AgentInsight:
         f"MA20：{fmt_number(context.ma20)}",
         f"MA60：{fmt_number(context.ma60)}",
         f"近 20 日平均成交量：{fmt_number(context.average_volume, decimals=0)}",
+        f"技術分數：{clamp_score(score):.2f}",
     ]
     degraded = any(
         value is None
@@ -70,6 +79,7 @@ def technical_agent(context) -> AgentInsight:
             name="技術分析 Agent",
             role="使用價格、報酬率、MA20、MA60 與成交量判斷趨勢",
             stance="中立",
+            score=0,
             confidence=0.25,
             summary="資料不足，技術分析暫採中立。",
             narrative=narrative,
@@ -79,12 +89,14 @@ def technical_agent(context) -> AgentInsight:
             risks=risks or ["資料不足導致技術面可靠度下降。"],
         )
 
-    stance = score_to_stance(score, bullish_threshold=2, bearish_threshold=-1)
+    score = clamp_score(score)
+    stance = score_to_stance(score)
     return AgentInsight(
         name="技術分析 Agent",
         role="使用價格、報酬率、MA20、MA60 與成交量判斷趨勢",
         stance=stance,
-        confidence=bounded_confidence(0.42 + available * 0.13 + min(abs(score), 3) * 0.04),
+        score=score,
+        confidence=bounded_confidence(0.38 + available * 0.10 + min(abs(score), 2) * 0.07),
         summary=(
             f"最新收盤 {fmt_number(context.latest_close)}，MA20 {fmt_number(context.ma20)}，"
             f"MA60 {fmt_number(context.ma60)}，20 日報酬 {fmt_number(context.return_20d, suffix='%')}。"
@@ -100,40 +112,44 @@ def technical_agent(context) -> AgentInsight:
 def fundamental_agent(context) -> AgentInsight:
     reasons: list[str] = []
     risks: list[str] = []
-    score = 0
+    score = 0.0
     available = 0
 
     if context.revenue_growth is not None:
         available += 1
         if context.revenue_growth > 5:
-            score += 1
+            score += 0.5
             reasons.append("月營收年增率高於 5%，營運動能具支撐。")
+            if context.revenue_growth > 15:
+                score += 0.5
+                reasons.append("月營收年增率高於 15%，成長動能明顯。")
         elif context.revenue_growth > 0:
             reasons.append("月營收年增率為正，但成長強度仍需追蹤。")
-        else:
-            score -= 1
-            risks.append("月營收年增率不佳，營運動能偏保守。")
+        elif context.revenue_growth < -5:
+            score -= 0.5
+            risks.append("月營收年增率低於 -5%，營運動能偏保守。")
     else:
         risks.append("月營收成長資料不足。")
 
     if context.eps is not None:
         available += 1
-        if context.eps > 3:
-            score += 1
-            reasons.append("EPS 表現具獲利支撐。")
-        elif context.eps > 0:
+        if context.eps > 0:
+            score += 0.5
             reasons.append("EPS 為正，具基本獲利能力。")
         else:
-            score -= 1
+            score -= 0.5
             risks.append("EPS 偏弱或為負，基本面需保守解讀。")
     else:
         risks.append("EPS 資料不足。")
 
     if context.pe_ratio is not None:
         available += 1
-        if context.pe_ratio >= 30:
-            score -= 1
-            risks.append("本益比偏高，評價可能已反映較多成長預期。")
+        if 0 < context.pe_ratio < 25:
+            score += 0.5
+            reasons.append("本益比低於 25，評價面相對未過度擴張。")
+        elif context.pe_ratio > 40 and context.revenue_growth is not None and context.revenue_growth <= 15:
+            score -= 0.5
+            risks.append("本益比高於 40 且營收成長未明顯加速，評價風險上升。")
         elif context.pe_ratio > 0:
             reasons.append("本益比資料可用，可作為評價面追蹤基準。")
     else:
@@ -143,6 +159,7 @@ def fundamental_agent(context) -> AgentInsight:
         f"EPS：{fmt_number(context.eps)}",
         f"本益比：{fmt_number(context.pe_ratio)}",
         f"月營收成長率：{fmt_number(context.revenue_growth, suffix='%')}",
+        f"基本面分數：{clamp_score(score):.2f}",
     ]
     degraded = any(value is None for value in [context.eps, context.pe_ratio, context.revenue_growth])
     narrative = (
@@ -156,6 +173,7 @@ def fundamental_agent(context) -> AgentInsight:
             name="基本面 Agent",
             role="使用 EPS、本益比與月營收成長檢查營運品質",
             stance="中立",
+            score=0,
             confidence=0.22,
             summary="資料不足，基本面分析暫採中立。",
             narrative=narrative,
@@ -165,12 +183,14 @@ def fundamental_agent(context) -> AgentInsight:
             risks=risks or ["基本面資料不足導致可靠度下降。"],
         )
 
-    stance = score_to_stance(score, bullish_threshold=2, bearish_threshold=-1)
+    score = clamp_score(score)
+    stance = score_to_stance(score)
     return AgentInsight(
         name="基本面 Agent",
         role="使用 EPS、本益比與月營收成長檢查營運品質",
         stance=stance,
-        confidence=bounded_confidence(0.36 + available * 0.14 + min(abs(score), 3) * 0.04),
+        score=score,
+        confidence=bounded_confidence(0.34 + available * 0.13 + min(abs(score), 2) * 0.06),
         summary=(
             f"EPS {fmt_number(context.eps)}，本益比 {fmt_number(context.pe_ratio)}，"
             f"月營收成長 {fmt_number(context.revenue_growth, suffix='%')}。"
@@ -186,17 +206,23 @@ def fundamental_agent(context) -> AgentInsight:
 def chip_agent(context) -> AgentInsight:
     reasons: list[str] = []
     risks: list[str] = []
-    score = 0
+    score = 0.0
     available = 0
 
     if context.foreign_buy is not None:
         available += 1
         if context.foreign_buy > 0:
-            score += 1
+            score += 0.5
             reasons.append("外資最近一日呈現買超，籌碼面偏正向。")
+            if context.foreign_buy >= 10_000_000:
+                score += 0.5
+                reasons.append("外資買超超過 1,000 萬股，屬於明顯買超。")
         elif context.foreign_buy < 0:
-            score -= 1
+            score -= 0.5
             risks.append("外資最近一日呈現賣超，籌碼面偏保守。")
+            if context.foreign_buy <= -10_000_000:
+                score -= 0.5
+                risks.append("外資賣超超過 1,000 萬股，屬於明顯賣超。")
     else:
         risks.append("外資買賣超資料不足。")
 
@@ -228,6 +254,8 @@ def chip_agent(context) -> AgentInsight:
         f"外資買賣超：{fmt_number(context.foreign_buy, decimals=0)}",
         f"三大法人合計：{fmt_number(context.institutional_net_buy, decimals=0)}",
         f"融資餘額變化：{fmt_number(context.margin_balance_change, decimals=0)}",
+        "明顯買賣超門檻：10,000,000 股",
+        f"籌碼分數：{clamp_score(score):.2f}",
     ]
     degraded = any(
         value is None for value in [context.foreign_buy, context.institutional_net_buy, context.margin_balance_change]
@@ -244,6 +272,7 @@ def chip_agent(context) -> AgentInsight:
             name="籌碼分析 Agent",
             role="使用外資買賣超、三大法人與融資融券觀察資金流向",
             stance="中立",
+            score=0,
             confidence=0.22,
             summary="資料不足，籌碼分析暫採中立並標記降級。",
             narrative=narrative,
@@ -253,12 +282,14 @@ def chip_agent(context) -> AgentInsight:
             risks=risks or ["籌碼資料不足導致分析降級。"],
         )
 
-    stance = score_to_stance(score, bullish_threshold=2, bearish_threshold=-1)
+    score = clamp_score(score)
+    stance = score_to_stance(score)
     return AgentInsight(
         name="籌碼分析 Agent",
         role="使用外資買賣超、三大法人與融資融券觀察資金流向",
         stance=stance,
-        confidence=bounded_confidence(0.34 + available * 0.13 + min(abs(score), 3) * 0.04),
+        score=score,
+        confidence=bounded_confidence(0.32 + available * 0.12 + min(abs(score), 2) * 0.08),
         summary=(
             f"外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}，"
             f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}，"
@@ -288,13 +319,15 @@ def risk_agent(context, prior_agents: list[AgentInsight]) -> AgentInsight:
         risks.append("評價偏高時，任何營運不如預期都可能放大波動。")
 
     unique_risks = unique_items(risks) or ["未出現重大規則式風險，但資料可能延遲或不完整。"]
-    stance: Rating = "偏空" if len(unique_risks) >= 3 else "中立"
+    risk_score = risk_score_from_count(len(unique_risks))
+    stance: Rating = "偏空" if risk_score <= -1 else "中立"
     degraded = any(not status.ok for status in context.source_status)
     evidence = [
         f"風險項目數：{len(unique_risks)}",
         f"20 日報酬率：{fmt_number(context.return_20d, suffix='%')}",
         f"本益比：{fmt_number(context.pe_ratio)}",
         f"資料來源狀態：{'; '.join(status.message for status in context.source_status) or '資料暫無'}",
+        f"風險分數：{risk_score:.2f}",
     ]
     narrative = (
         f"風險控管以反方角度檢查 {len(unique_risks)} 項風險。短線動能方面，20 日報酬率為 "
@@ -305,6 +338,7 @@ def risk_agent(context, prior_agents: list[AgentInsight]) -> AgentInsight:
         name="風險控管 Agent",
         role="提出反方觀點，檢查趨勢、評價、籌碼與資料品質風險",
         stance=stance,
+        score=risk_score,
         confidence=0.68 if stance == "偏空" else 0.48,
         summary="反方檢查聚焦於資料缺漏、趨勢轉弱、評價偏高與籌碼壓力。",
         narrative=narrative,
@@ -316,12 +350,24 @@ def risk_agent(context, prior_agents: list[AgentInsight]) -> AgentInsight:
 
 
 def decision_agent(context, prior_agents: list[AgentInsight]) -> tuple[AgentInsight, DecisionSummary, Rating]:
-    weighted_score = 0.0
-    for agent in prior_agents:
-        if agent.stance == "偏多":
-            weighted_score += agent.confidence
-        elif agent.stance == "偏空":
-            weighted_score -= agent.confidence
+    score_by_agent = {agent.name: agent.score for agent in prior_agents}
+    weighted_score = (
+        score_by_agent.get("技術分析 Agent", 0) * 0.4
+        + score_by_agent.get("基本面 Agent", 0) * 0.3
+        + score_by_agent.get("籌碼分析 Agent", 0) * 0.2
+        + score_by_agent.get("風險控管 Agent", 0) * 0.1
+    )
+    final_score = round(weighted_score, 2)
+    score_breakdown = {
+        "technical": round(score_by_agent.get("技術分析 Agent", 0), 2),
+        "fundamental": round(score_by_agent.get("基本面 Agent", 0), 2),
+        "chip": round(score_by_agent.get("籌碼分析 Agent", 0), 2),
+        "risk": round(score_by_agent.get("風險控管 Agent", 0), 2),
+        "technicalWeighted": round(score_by_agent.get("技術分析 Agent", 0) * 0.4, 2),
+        "fundamentalWeighted": round(score_by_agent.get("基本面 Agent", 0) * 0.3, 2),
+        "chipWeighted": round(score_by_agent.get("籌碼分析 Agent", 0) * 0.2, 2),
+        "riskWeighted": round(score_by_agent.get("風險控管 Agent", 0) * 0.1, 2),
+    }
 
     bullish_reasons = [
         reason
@@ -337,22 +383,24 @@ def decision_agent(context, prior_agents: list[AgentInsight]) -> tuple[AgentInsi
     if context.finmind_errors:
         watch_points.extend(context.finmind_errors[:3])
 
-    if weighted_score >= 1.05:
+    if final_score >= 0.6:
         rating: Rating = "偏多"
-    elif weighted_score <= -0.85:
+    elif final_score <= -0.6:
         rating = "偏空"
     else:
         rating = "中立"
 
-    confidence = bounded_confidence(0.42 + min(abs(weighted_score), 1.5) * 0.22)
+    confidence = bounded_confidence(0.42 + min(abs(final_score), 1.5) * 0.22)
     recommendation_text = (
-        f"綜合判斷為「{rating}」。技術面目前參考收盤價 {fmt_number(context.latest_close)}、"
+        f"綜合判斷為「{rating}」，finalScore 為 {final_score:.2f}。技術面目前參考收盤價 {fmt_number(context.latest_close)}、"
         f"MA20 {fmt_number(context.ma20)}、MA60 {fmt_number(context.ma60)} 與 20 日報酬率 "
         f"{fmt_number(context.return_20d, suffix='%')}；基本面參考 EPS {fmt_number(context.eps)}、"
         f"本益比 {fmt_number(context.pe_ratio)} 與月營收成長 {fmt_number(context.revenue_growth, suffix='%')}；"
         f"籌碼面參考外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}、三大法人合計 "
         f"{fmt_number(context.institutional_net_buy, decimals=0)} 與融資餘額變化 "
-        f"{fmt_number(context.margin_balance_change, decimals=0)}。建議後續觀察均線是否延續、"
+        f"{fmt_number(context.margin_balance_change, decimals=0)}。加權分數由技術 {score_breakdown['technicalWeighted']:.2f}、"
+        f"基本面 {score_breakdown['fundamentalWeighted']:.2f}、籌碼 {score_breakdown['chipWeighted']:.2f}、"
+        f"風險 {score_breakdown['riskWeighted']:.2f} 組成。建議後續觀察均線是否延續、"
         f"月營收與 EPS 是否改善，以及法人買賣超和融資變化是否支持目前方向；本系統不構成交易建議。"
     )
     decision = DecisionSummary(
@@ -360,19 +408,22 @@ def decision_agent(context, prior_agents: list[AgentInsight]) -> tuple[AgentInsi
         risks=risk_items or ["未出現重大規則式風險，但仍需注意資料延遲與市場波動。"],
         watchPoints=unique_items(watch_points),
         recommendationText=recommendation_text,
+        finalScore=final_score,
+        scoreBreakdown=score_breakdown,
     )
     evidence = [
-        f"加權分數：{weighted_score:.2f}",
-        f"技術面立場：{prior_agents[0].stance if len(prior_agents) > 0 else '資料暫無'}",
-        f"基本面立場：{prior_agents[1].stance if len(prior_agents) > 1 else '資料暫無'}",
-        f"籌碼面立場：{prior_agents[2].stance if len(prior_agents) > 2 else '資料暫無'}",
-        f"風險控管立場：{prior_agents[3].stance if len(prior_agents) > 3 else '資料暫無'}",
+        f"finalScore：{final_score:.2f}",
+        f"技術面分數：{score_breakdown['technical']:.2f}，權重 40%",
+        f"基本面分數：{score_breakdown['fundamental']:.2f}，權重 30%",
+        f"籌碼面分數：{score_breakdown['chip']:.2f}，權重 20%",
+        f"風險控管分數：{score_breakdown['risk']:.2f}，權重 10%",
     ]
     degraded = any(agent.degraded for agent in prior_agents)
     agent = AgentInsight(
         name="總結決策 Agent",
         role="整合技術、基本面、籌碼與風險控管觀點",
         stance=rating,
+        score=clamp_score(final_score),
         confidence=confidence,
         summary=f"加權整合後的規則式結論為「{rating}」，不構成買賣建議。",
         narrative=recommendation_text,
@@ -419,6 +470,8 @@ def safe_decision_agent(context, agents: list[AgentInsight]) -> tuple[AgentInsig
             risks=fallback.risks,
             watchPoints=["請稍後重試，或檢查資料來源與網路狀態。"],
             recommendationText="總結決策發生降級，目前僅能採中立觀察，請稍後重試或檢查資料來源。",
+            finalScore=0,
+            scoreBreakdown={},
         )
         return fallback, summary, "中立"
 
@@ -428,6 +481,7 @@ def fallback_agent(name: str, message: str, exc: Exception) -> AgentInsight:
         name=name,
         role="規則式分析降級",
         stance="中立",
+        score=0,
         confidence=0.12,
         summary=message,
         narrative=f"{name} 無法完成完整規則式分析，原因為 {type(exc).__name__}；目前以資料不足處理並採中立觀察。",
@@ -468,12 +522,24 @@ def build_debate(agents: list[AgentInsight], rating: Rating) -> list[DebateMessa
     return debate
 
 
-def score_to_stance(score: int, bullish_threshold: int, bearish_threshold: int) -> Rating:
-    if score >= bullish_threshold:
+def score_to_stance(score: float) -> Rating:
+    if score >= 1:
         return "偏多"
-    if score <= bearish_threshold:
+    if score <= -1:
         return "偏空"
     return "中立"
+
+
+def clamp_score(value: float) -> float:
+    return round(max(-2.0, min(2.0, value)), 2)
+
+
+def risk_score_from_count(risk_count: int) -> float:
+    if risk_count >= 5:
+        return -1.0
+    if risk_count >= 3:
+        return -0.5
+    return 0.0
 
 
 def bounded_confidence(value: float) -> float:

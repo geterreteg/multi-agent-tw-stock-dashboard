@@ -31,6 +31,7 @@ export type AgentInsight = {
   name: string;
   role: string;
   stance: Rating;
+  score: number;
   confidence: number;
   summary: string;
   narrative: string;
@@ -66,6 +67,8 @@ export type AnalyzeResponse = {
     risks: string[];
     watchPoints: string[];
     recommendationText: string;
+    finalScore: number;
+    scoreBreakdown: Record<string, number>;
   };
   sources: Array<{
     name: string;

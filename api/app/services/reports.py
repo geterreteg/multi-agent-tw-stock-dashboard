@@ -19,7 +19,7 @@ def generate_markdown_report(
     )
     agent_sections = "\n\n".join(
         f"### {agent.name}\n{agent.summary}\n\n{agent.narrative}\n\n"
-        f"立場：{agent.stance}\n\n信心程度：{agent.confidence:.0%}\n\n"
+        f"立場：{agent.stance}\n\n分數：{agent.score:.2f}\n\n信心程度：{agent.confidence:.0%}\n\n"
         f"資料狀態：{'降級' if agent.degraded else '完整'}\n\n使用數據："
         + "\n".join(f"- {item}" for item in agent.evidence)
         + "\n\n主要理由："
@@ -71,6 +71,10 @@ def generate_markdown_report(
 
 ## 五、最終研究結論
 ### 綜合評級：{final_rating}
+
+finalScore：{decision.finalScore:.2f}
+
+scoreBreakdown：{decision.scoreBreakdown}
 
 #### 支持理由
 {support_items}

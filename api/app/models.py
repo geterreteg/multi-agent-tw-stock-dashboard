@@ -54,6 +54,7 @@ class AgentInsight(BaseModel):
     name: str
     role: str
     stance: Rating
+    score: float = Field(..., ge=-2, le=2)
     confidence: float = Field(..., ge=0, le=1)
     summary: str
     narrative: str
@@ -75,6 +76,8 @@ class DecisionSummary(BaseModel):
     risks: list[str]
     watchPoints: list[str]
     recommendationText: str
+    finalScore: float
+    scoreBreakdown: dict[str, float]
 
 
 class DataSourceStatus(BaseModel):

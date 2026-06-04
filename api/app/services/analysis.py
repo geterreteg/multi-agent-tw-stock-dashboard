@@ -170,6 +170,8 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
         risks=[message],
         watchPoints=["請稍後重試，或檢查資料來源與網路狀態。"],
         recommendationText="資料服務發生錯誤，目前僅能採中立觀察；請稍後重試，或檢查資料來源與網路狀態。",
+        finalScore=0,
+        scoreBreakdown={},
     )
     return AnalyzeResponse(
         symbol=normalized,
@@ -184,6 +186,7 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
                 name="資料蒐集 Agent",
                 role="資料錯誤攔截",
                 stance="中立",
+                score=0,
                 confidence=0.12,
                 summary=message,
                 narrative=f"資料蒐集階段發生錯誤：{message}。目前無法形成完整分析，系統採中立觀察並保留降級提示。",
