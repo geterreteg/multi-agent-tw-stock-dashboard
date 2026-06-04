@@ -53,9 +53,18 @@ class ChartBundle(BaseModel):
 class AgentInsight(BaseModel):
     name: str
     role: str
-    view: str
-    confidence: int
+    stance: Rating
+    confidence: float = Field(..., ge=0, le=1)
+    summary: str
     reasons: list[str]
+    risks: list[str]
+
+
+class DebateMessage(BaseModel):
+    speaker: str
+    stance: Rating
+    message: str
+    tone: Literal["support", "risk", "summary", "neutral"]
 
 
 class DecisionSummary(BaseModel):
@@ -79,6 +88,7 @@ class AnalyzeResponse(BaseModel):
     metrics: MetricSnapshot
     charts: ChartBundle
     agents: list[AgentInsight]
+    debate: list[DebateMessage] = Field(default_factory=list)
     decision: DecisionSummary
     sources: list[DataSourceStatus]
     reportMarkdown: str

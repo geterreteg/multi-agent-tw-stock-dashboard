@@ -18,8 +18,6 @@ from app.models import (
     VolumePoint,
 )
 from app.services.market_data import (
-    FINMIND_SOURCE,
-    YFINANCE_SOURCE,
     SourceStatus,
     fetch_finmind_bundle,
     fetch_yfinance_bundle,
@@ -28,6 +26,7 @@ from app.services.market_data import (
     safe_float,
     safe_int,
 )
+from app.services.agents import run_agents
 from app.services.reports import generate_markdown_report
 
 
@@ -100,10 +99,8 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
     except Exception as exc:
         return build_failed_response(symbol, period, f"資料服務發生未預期錯誤：{type(exc).__name__}")
 
-    decision = build_basic_decision(context)
-    agents = build_basic_agents(context, decision)
-    rating = decide_basic_rating(context)
-    report = generate_markdown_report(context, agents, rating, decision)
+    agents, debate, decision, rating = run_agents(context)
+    report = generate_markdown_report(context, agents, rating, decision, debate)
 
     return AnalyzeResponse(
         symbol=context.stock_id,
@@ -123,6 +120,7 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
         ),
         charts=build_chart_bundle(context.price_history),
         agents=agents,
+        debate=debate,
         decision=decision,
         sources=[source_to_api_status(status) for status in context.source_status],
         reportMarkdown=report,
@@ -165,96 +163,6 @@ def source_to_api_status(status: SourceStatus) -> DataSourceStatus:
     )
 
 
-def decide_basic_rating(context: StockContext):
-    if context.latest_close is None:
-        return "中立"
-    positive = 0
-    negative = 0
-    if context.ma20 is not None and context.latest_close >= context.ma20:
-        positive += 1
-    elif context.ma20 is not None:
-        negative += 1
-    if context.return_20d is not None and context.return_20d > 5:
-        positive += 1
-    elif context.return_20d is not None and context.return_20d < -5:
-        negative += 1
-    if context.revenue_growth is not None and context.revenue_growth > 5:
-        positive += 1
-    if context.foreign_buy is not None and context.foreign_buy < 0:
-        negative += 1
-    if positive >= 3 and negative == 0:
-        return "偏多"
-    if negative >= 2:
-        return "偏空"
-    return "中立"
-
-
-def build_basic_decision(context: StockContext) -> DecisionSummary:
-    support = []
-    risks = []
-    watch = []
-
-    if context.latest_close is not None and context.ma20 is not None and context.latest_close >= context.ma20:
-        support.append("收盤價站上 MA20，短線技術面偏穩。")
-    if context.revenue_growth is not None and context.revenue_growth > 0:
-        support.append("月營收成長率為正，營運動能具支撐。")
-    if context.foreign_buy is not None and context.foreign_buy > 0:
-        support.append("外資買賣超為正，籌碼面偏正向。")
-
-    if context.latest_close is None:
-        risks.append("股價資料暫無，技術分析已降級。")
-    if context.eps is None:
-        risks.append("EPS 資料暫無，基本面分析可靠度下降。")
-    if context.foreign_buy is None:
-        risks.append("法人買賣超資料暫無，籌碼分析可靠度下降。")
-    for status in context.source_status:
-        if not status.ok:
-            risks.append(status.message)
-
-    watch.extend(["追蹤下一期月營收與法人買賣超。", "確認 yfinance 與 FinMind 資料更新狀態。"])
-    if context.finmind_errors:
-        watch.extend(context.finmind_errors[:3])
-
-    return DecisionSummary(
-        supportReasons=support or ["目前可用資料尚不足以形成明確偏多理由。"],
-        risks=risks or ["未出現重大規則式風險，但仍需注意資料延遲與市場波動。"],
-        watchPoints=watch,
-    )
-
-
-def build_basic_agents(context: StockContext, decision: DecisionSummary) -> list[AgentInsight]:
-    return [
-        AgentInsight(
-            name="資料蒐集 Agent",
-            role="整合 yfinance 與 FinMind 資料狀態",
-            view=f"{YFINANCE_SOURCE} 與 {FINMIND_SOURCE} 已完成資料請求，缺漏資料會以降級狀態呈現。",
-            confidence=82 if any(status.ok for status in context.source_status) else 45,
-            reasons=[status.message for status in context.source_status],
-        ),
-        AgentInsight(
-            name="技術分析 Agent",
-            role="觀察股價、成交量與均線",
-            view=f"最新收盤價 {context.latest_close if context.latest_close is not None else '資料暫無'}，MA20 {context.ma20 if context.ma20 is not None else '資料暫無'}。",
-            confidence=78 if context.latest_close is not None else 35,
-            reasons=["使用 yfinance 歷史價格計算 MA20、MA60 與 20 日報酬。"],
-        ),
-        AgentInsight(
-            name="基本面 Agent",
-            role="觀察營收、EPS 與本益比",
-            view=f"EPS {context.eps if context.eps is not None else '資料暫無'}，本益比 {context.pe_ratio if context.pe_ratio is not None else '資料暫無'}。",
-            confidence=72 if context.eps is not None else 38,
-            reasons=["使用 FinMind 財務與 PER 資料，缺資料時保留 null。"],
-        ),
-        AgentInsight(
-            name="風險控管 Agent",
-            role="提出反方觀點與資料限制",
-            view="；".join(decision.risks),
-            confidence=70,
-            reasons=decision.risks,
-        ),
-    ]
-
-
 def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResponse:
     normalized = symbol.strip() or "UNKNOWN"
     decision = DecisionSummary(
@@ -274,11 +182,14 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
             AgentInsight(
                 name="資料蒐集 Agent",
                 role="資料錯誤攔截",
-                view=message,
-                confidence=20,
-                reasons=[message],
+                stance="中立",
+                confidence=0.12,
+                summary=message,
+                reasons=["資料不足"],
+                risks=[message],
             )
         ],
+        debate=[],
         decision=decision,
         sources=[DataSourceStatus(name="FastAPI", status="failed", message=message)],
         reportMarkdown=f"# {normalized} 分析暫停\n\n{message}\n\n{DISCLAIMER}",

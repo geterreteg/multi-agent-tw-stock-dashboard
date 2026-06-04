@@ -5,6 +5,7 @@
 .yfinance_cache/
 __pycache__/
 *.pyc
+*.tsbuildinfo
 .venv/
 venv/
 api/.env

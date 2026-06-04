@@ -1,21 +1,32 @@
 from __future__ import annotations
 
-from app.models import AgentInsight, DecisionSummary
+from app.models import AgentInsight, DebateMessage, DecisionSummary
 from app.services.market_data import FINMIND_SOURCE, YFINANCE_SOURCE, fmt_number
 
 DISCLAIMER = "本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。投資人仍應自行評估風險並承擔投資結果。"
 DATA_DELAY_NOTE = "資料可能延遲或不完整，本系統不宣稱資料完全即時。"
 
 
-def generate_markdown_report(context, agents: list[AgentInsight], final_rating: str, decision: DecisionSummary) -> str:
+def generate_markdown_report(
+    context,
+    agents: list[AgentInsight],
+    final_rating: str,
+    decision: DecisionSummary,
+    debate: list[DebateMessage] | None = None,
+) -> str:
     source_items = "\n".join(
         f"- {status.name}：{'成功' if status.ok else '降級'}，{status.message}" for status in context.source_status
     )
     agent_sections = "\n\n".join(
-        f"### {agent.name}\n{agent.view}\n\n信心程度：{agent.confidence}%\n\n主要理由："
+        f"### {agent.name}\n{agent.summary}\n\n立場：{agent.stance}\n\n信心程度：{agent.confidence:.0%}\n\n主要理由："
         + "\n".join(f"- {reason}" for reason in agent.reasons)
+        + "\n\n主要風險："
+        + "\n".join(f"- {risk}" for risk in agent.risks)
         for agent in agents
     )
+    debate_items = "\n".join(
+        f"- **{item.speaker}（{item.stance}）**：{item.message}" for item in (debate or [])
+    ) or "- 本次無辯論紀錄。"
     support_items = "\n".join(f"- {item}" for item in decision.supportReasons)
     risk_items = "\n".join(f"- {item}" for item in decision.risks)
     watch_items = "\n".join(f"- {item}" for item in decision.watchPoints)
@@ -51,7 +62,10 @@ def generate_markdown_report(context, agents: list[AgentInsight], final_rating: 
 ## 三、多 Agent 分析
 {agent_sections}
 
-## 四、最終研究結論
+## 四、Agent 辯論室
+{debate_items}
+
+## 五、最終研究結論
 ### 綜合評級：{final_rating}
 
 #### 支持理由
@@ -63,7 +77,7 @@ def generate_markdown_report(context, agents: list[AgentInsight], final_rating: 
 #### 觀察重點
 {watch_items}
 
-## 五、資料限制與免責聲明
+## 六、資料限制與免責聲明
 {DATA_DELAY_NOTE}
 
 {DISCLAIMER}

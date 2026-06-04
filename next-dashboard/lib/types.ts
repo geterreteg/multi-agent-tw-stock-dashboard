@@ -30,9 +30,18 @@ export type MovingAveragePoint = {
 export type AgentInsight = {
   name: string;
   role: string;
-  view: string;
+  stance: Rating;
   confidence: number;
+  summary: string;
   reasons: string[];
+  risks: string[];
+};
+
+export type DebateMessage = {
+  speaker: string;
+  stance: Rating;
+  message: string;
+  tone: "support" | "risk" | "summary" | "neutral";
 };
 
 export type AnalyzeResponse = {
@@ -48,6 +57,7 @@ export type AnalyzeResponse = {
     movingAverage: MovingAveragePoint[];
   };
   agents: AgentInsight[];
+  debate: DebateMessage[];
   decision: {
     supportReasons: string[];
     risks: string[];
