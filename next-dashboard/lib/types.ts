@@ -33,6 +33,9 @@ export type AgentInsight = {
   stance: Rating;
   confidence: number;
   summary: string;
+  narrative: string;
+  evidence: string[];
+  degraded: boolean;
   reasons: string[];
   risks: string[];
 };
@@ -62,6 +65,7 @@ export type AnalyzeResponse = {
     supportReasons: string[];
     risks: string[];
     watchPoints: string[];
+    recommendationText: string;
   };
   sources: Array<{
     name: string;

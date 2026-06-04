@@ -18,7 +18,11 @@ def generate_markdown_report(
         f"- {status.name}：{'成功' if status.ok else '降級'}，{status.message}" for status in context.source_status
     )
     agent_sections = "\n\n".join(
-        f"### {agent.name}\n{agent.summary}\n\n立場：{agent.stance}\n\n信心程度：{agent.confidence:.0%}\n\n主要理由："
+        f"### {agent.name}\n{agent.summary}\n\n{agent.narrative}\n\n"
+        f"立場：{agent.stance}\n\n信心程度：{agent.confidence:.0%}\n\n"
+        f"資料狀態：{'降級' if agent.degraded else '完整'}\n\n使用數據："
+        + "\n".join(f"- {item}" for item in agent.evidence)
+        + "\n\n主要理由："
         + "\n".join(f"- {reason}" for reason in agent.reasons)
         + "\n\n主要風險："
         + "\n".join(f"- {risk}" for risk in agent.risks)
@@ -76,6 +80,9 @@ def generate_markdown_report(
 
 #### 觀察重點
 {watch_items}
+
+#### 觀察建議
+{decision.recommendationText}
 
 ## 六、資料限制與免責聲明
 {DATA_DELAY_NOTE}

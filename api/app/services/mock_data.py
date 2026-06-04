@@ -42,7 +42,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         ma60 = round(close - step * 5 + index * 0.22, 2)
         price.append(PricePoint(date=day, close=close))
         volume.append(VolumePoint(date=day, volume=18_000_000 + index * 420_000 + (index % 4) * 600_000))
-        moving_average.append(MovingAveragePoint(date=day, close=close, ma20=ma20, ma60=ma60))
+        moving_average.append(MovingAveragePoint(date=day, ma20=ma20, ma60=ma60))
 
     metrics = MetricSnapshot(
         latestClose=price[-1].close,
@@ -59,37 +59,62 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="資料蒐集 Agent",
             role="整合價格、籌碼與基本面資料狀態",
-            view="mock 資料已完成整合，後續可替換為 yfinance 與 FinMind 真實資料。",
-            confidence=92,
+            stance="中立",
+            confidence=0.92,
+            summary="mock 資料已完成整合，後續可替換為 yfinance 與 FinMind 真實資料。",
+            narrative="示範資料包含價格、成交量、均線、EPS、本益比、營收成長與外資買賣超，僅供前端資料格式驗收。",
+            evidence=["資料型態：mock", "資料來源：FastAPI mock backend"],
+            degraded=True,
             reasons=["資料格式已接近真實 API response", "前端可先完成圖表與卡片驗收"],
+            risks=["資料非真實市場資料"],
         ),
         AgentInsight(
             name="技術分析 Agent",
             role="觀察趨勢、均線與短線動能",
-            view="價格維持在主要均線附近，趨勢偏穩但尚未形成強烈方向。",
-            confidence=78,
+            stance="中立",
+            confidence=0.78,
+            summary="價格維持在主要均線附近，趨勢偏穩但尚未形成強烈方向。",
+            narrative=f"示範最新收盤價 {metrics.latestClose}，MA20 {metrics.ma20}，MA60 {metrics.ma60}，20 日報酬率 {metrics.return20d}%。",
+            evidence=[f"最新收盤價：{metrics.latestClose}", f"MA20：{metrics.ma20}", f"MA60：{metrics.ma60}", f"20 日報酬率：{metrics.return20d}%"],
+            degraded=True,
             reasons=["MA20 高於 MA60", "20 日報酬為正"],
+            risks=["示範資料不可代表真實技術面"],
         ),
         AgentInsight(
             name="基本面 Agent",
             role="評估營收、EPS 與本益比",
-            view="營收成長與 EPS 具支撐，但評價面仍需與同業比較。",
-            confidence=74,
+            stance="中立",
+            confidence=0.74,
+            summary="營收成長與 EPS 具支撐，但評價面仍需與同業比較。",
+            narrative=f"示範 EPS {metrics.eps}，本益比 {metrics.peRatio}，營收成長 {metrics.revenueGrowth}%。",
+            evidence=[f"EPS：{metrics.eps}", f"本益比：{metrics.peRatio}", f"營收成長：{metrics.revenueGrowth}%"],
+            degraded=True,
             reasons=["營收成長率為正", "EPS 維持獲利支撐"],
+            risks=["示範資料不可代表真實基本面"],
         ),
         AgentInsight(
             name="風險控管 Agent",
             role="提出反方觀點與資料限制",
-            view="目前資料為示範 mock data，正式分析前仍需接回真實資料源。",
-            confidence=70,
+            stance="中立",
+            confidence=0.70,
+            summary="目前資料為示範 mock data，正式分析前仍需接回真實資料源。",
+            narrative="風險控管提醒目前資料並非真實 yfinance 或 FinMind 回傳，因此任何評級只可作為前端格式展示。",
+            evidence=["資料狀態：mock", "風險：資料非即時且非真實"],
+            degraded=True,
             reasons=["資料非即時", "模型仍為規則式研究輔助"],
+            risks=["正式分析前需接回真實資料源"],
         ),
         AgentInsight(
             name="決策整合 Agent",
             role="整合多方觀點產生評級",
-            view="整體訊號偏穩，第一版示範評級為中立。",
-            confidence=82,
+            stance="中立",
+            confidence=0.82,
+            summary="整體訊號偏穩，第一版示範評級為中立。",
+            narrative="示範決策整合技術、基本面與風險提醒後採中立觀察，不構成買賣建議。",
+            evidence=["示範評級：中立", "資料狀態：mock"],
+            degraded=True,
             reasons=["正向訊號與風險提醒並存", "適合持續觀察"],
+            risks=["示範資料不能作為投資依據"],
         ),
     ]
 
@@ -97,6 +122,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         supportReasons=["短期趨勢維持穩定", "營收與 EPS mock 指標呈現支撐", "法人買賣超示範值為正"],
         risks=["目前仍為 mock data", "正式版需驗證 FinMind 權限與資料完整度", "不應視為買賣建議"],
         watchPoints=["接回真實 yfinance 歷史價格", "接回 FinMind 月營收與法人資料", "建立 API 錯誤與降級狀態"],
+        recommendationText="示範資料僅供格式驗收，正式研究需以 yfinance 與 FinMind 真實資料重新分析，目前採中立觀察。",
     )
 
     report = f"""# {normalized} {name} 多 Agent 投資分析摘要
@@ -121,8 +147,8 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         agents=agents,
         decision=decision,
         sources=[
-            DataSourceStatus(name="FastAPI mock backend", status="正常", message="第一版使用 mock data 驗證前端體驗。"),
-            DataSourceStatus(name="yfinance / FinMind", status="規劃中", message="下一階段接回既有 Python 分析邏輯。"),
+            DataSourceStatus(name="FastAPI mock backend", status="ok", message="第一版使用 mock data 驗證前端體驗。"),
+            DataSourceStatus(name="yfinance / FinMind", status="planned", message="下一階段接回既有 Python 分析邏輯。"),
         ],
         reportMarkdown=report,
         disclaimer=DISCLAIMER,

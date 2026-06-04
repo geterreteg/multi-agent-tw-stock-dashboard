@@ -47,6 +47,24 @@ def technical_agent(context) -> AgentInsight:
     if context.average_volume is not None and context.average_volume < 1_000_000:
         risks.append("近 20 日平均成交量偏低，流動性需要留意。")
 
+    evidence = [
+        f"最新收盤價：{fmt_number(context.latest_close)}",
+        f"20 日報酬率：{fmt_number(context.return_20d, suffix='%')}",
+        f"MA20：{fmt_number(context.ma20)}",
+        f"MA60：{fmt_number(context.ma60)}",
+        f"近 20 日平均成交量：{fmt_number(context.average_volume, decimals=0)}",
+    ]
+    degraded = any(
+        value is None
+        for value in [context.latest_close, context.return_20d, context.ma20, context.ma60, context.average_volume]
+    )
+    narrative = (
+        f"技術面觀察最新收盤價 {fmt_number(context.latest_close)}，相較 MA20 {fmt_number(context.ma20)} "
+        f"與 MA60 {fmt_number(context.ma60)} 用來判斷短中期趨勢位置；近 20 日報酬率為 "
+        f"{fmt_number(context.return_20d, suffix='%')}，代表短線動能強弱；近 20 日平均成交量為 "
+        f"{fmt_number(context.average_volume, decimals=0)}，用來檢查流動性是否足以支撐價格變化。"
+    )
+
     if available == 0:
         return AgentInsight(
             name="技術分析 Agent",
@@ -54,6 +72,9 @@ def technical_agent(context) -> AgentInsight:
             stance="中立",
             confidence=0.25,
             summary="資料不足，技術分析暫採中立。",
+            narrative=narrative,
+            evidence=evidence,
+            degraded=True,
             reasons=["yfinance 價格或均線資料暫無。"],
             risks=risks or ["資料不足導致技術面可靠度下降。"],
         )
@@ -68,6 +89,9 @@ def technical_agent(context) -> AgentInsight:
             f"最新收盤 {fmt_number(context.latest_close)}，MA20 {fmt_number(context.ma20)}，"
             f"MA60 {fmt_number(context.ma60)}，20 日報酬 {fmt_number(context.return_20d, suffix='%')}。"
         ),
+        narrative=narrative,
+        evidence=evidence,
+        degraded=degraded,
         reasons=reasons or ["技術指標未形成明確偏多訊號。"],
         risks=risks or ["未出現重大技術面風險，但仍需留意市場波動。"],
     )
@@ -115,6 +139,18 @@ def fundamental_agent(context) -> AgentInsight:
     else:
         risks.append("本益比資料不足。")
 
+    evidence = [
+        f"EPS：{fmt_number(context.eps)}",
+        f"本益比：{fmt_number(context.pe_ratio)}",
+        f"月營收成長率：{fmt_number(context.revenue_growth, suffix='%')}",
+    ]
+    degraded = any(value is None for value in [context.eps, context.pe_ratio, context.revenue_growth])
+    narrative = (
+        f"基本面以 EPS {fmt_number(context.eps)} 檢查獲利能力，以本益比 {fmt_number(context.pe_ratio)} "
+        f"觀察評價壓力，再用月營收成長率 {fmt_number(context.revenue_growth, suffix='%')} 判斷近期營運動能。"
+        f"{'目前部分基本面資料暫無，因此結論需降級解讀。' if degraded else '目前三項基本面指標皆可用，能形成較完整的營運與評價觀察。'}"
+    )
+
     if available == 0:
         return AgentInsight(
             name="基本面 Agent",
@@ -122,6 +158,9 @@ def fundamental_agent(context) -> AgentInsight:
             stance="中立",
             confidence=0.22,
             summary="資料不足，基本面分析暫採中立。",
+            narrative=narrative,
+            evidence=evidence,
+            degraded=True,
             reasons=["FinMind 基本面資料暫無。"],
             risks=risks or ["基本面資料不足導致可靠度下降。"],
         )
@@ -136,6 +175,9 @@ def fundamental_agent(context) -> AgentInsight:
             f"EPS {fmt_number(context.eps)}，本益比 {fmt_number(context.pe_ratio)}，"
             f"月營收成長 {fmt_number(context.revenue_growth, suffix='%')}。"
         ),
+        narrative=narrative,
+        evidence=evidence,
+        degraded=degraded,
         reasons=reasons or ["基本面資料未形成明確偏多訊號。"],
         risks=risks or ["未出現重大基本面風險，但需追蹤後續營收與財報。"],
     )
@@ -182,6 +224,21 @@ def chip_agent(context) -> AgentInsight:
     else:
         risks.append("融資融券資料不足，信用交易風險已降級。")
 
+    evidence = [
+        f"外資買賣超：{fmt_number(context.foreign_buy, decimals=0)}",
+        f"三大法人合計：{fmt_number(context.institutional_net_buy, decimals=0)}",
+        f"融資餘額變化：{fmt_number(context.margin_balance_change, decimals=0)}",
+    ]
+    degraded = any(
+        value is None for value in [context.foreign_buy, context.institutional_net_buy, context.margin_balance_change]
+    )
+    narrative = (
+        f"籌碼面觀察外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}，用來判斷外資短線方向；"
+        f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)} 可補充整體法人資金態度；"
+        f"融資餘額變化 {fmt_number(context.margin_balance_change, decimals=0)} 用來檢查信用交易是否增加槓桿壓力。"
+        f"{'目前籌碼或融資融券資料不完整，因此信心程度已下修。' if degraded else '目前主要籌碼指標皆可用。'}"
+    )
+
     if available == 0:
         return AgentInsight(
             name="籌碼分析 Agent",
@@ -189,6 +246,9 @@ def chip_agent(context) -> AgentInsight:
             stance="中立",
             confidence=0.22,
             summary="資料不足，籌碼分析暫採中立並標記降級。",
+            narrative=narrative,
+            evidence=evidence,
+            degraded=True,
             reasons=["FinMind 法人或融資融券資料暫無。"],
             risks=risks or ["籌碼資料不足導致分析降級。"],
         )
@@ -204,6 +264,9 @@ def chip_agent(context) -> AgentInsight:
             f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}，"
             f"融資餘額變化 {fmt_number(context.margin_balance_change, decimals=0)}。"
         ),
+        narrative=narrative,
+        evidence=evidence,
+        degraded=degraded,
         reasons=reasons or ["籌碼資料未形成明確偏多訊號。"],
         risks=risks or ["未出現重大籌碼風險，但需追蹤法人連續買賣超。"],
     )
@@ -226,12 +289,27 @@ def risk_agent(context, prior_agents: list[AgentInsight]) -> AgentInsight:
 
     unique_risks = unique_items(risks) or ["未出現重大規則式風險，但資料可能延遲或不完整。"]
     stance: Rating = "偏空" if len(unique_risks) >= 3 else "中立"
+    degraded = any(not status.ok for status in context.source_status)
+    evidence = [
+        f"風險項目數：{len(unique_risks)}",
+        f"20 日報酬率：{fmt_number(context.return_20d, suffix='%')}",
+        f"本益比：{fmt_number(context.pe_ratio)}",
+        f"資料來源狀態：{'; '.join(status.message for status in context.source_status) or '資料暫無'}",
+    ]
+    narrative = (
+        f"風險控管以反方角度檢查 {len(unique_risks)} 項風險。短線動能方面，20 日報酬率為 "
+        f"{fmt_number(context.return_20d, suffix='%')}；評價面方面，本益比為 {fmt_number(context.pe_ratio)}。"
+        f"若資料來源降級、短線漲幅過大、評價偏高或籌碼轉弱，結論就不宜只採用偏多訊號。"
+    )
     return AgentInsight(
         name="風險控管 Agent",
         role="提出反方觀點，檢查趨勢、評價、籌碼與資料品質風險",
         stance=stance,
         confidence=0.68 if stance == "偏空" else 0.48,
         summary="反方檢查聚焦於資料缺漏、趨勢轉弱、評價偏高與籌碼壓力。",
+        narrative=narrative,
+        evidence=evidence,
+        degraded=degraded,
         reasons=["風險控管 Agent 必須保留反方觀點，避免只看支持訊號。"],
         risks=unique_risks,
     )
@@ -267,17 +345,39 @@ def decision_agent(context, prior_agents: list[AgentInsight]) -> tuple[AgentInsi
         rating = "中立"
 
     confidence = bounded_confidence(0.42 + min(abs(weighted_score), 1.5) * 0.22)
+    recommendation_text = (
+        f"綜合判斷為「{rating}」。技術面目前參考收盤價 {fmt_number(context.latest_close)}、"
+        f"MA20 {fmt_number(context.ma20)}、MA60 {fmt_number(context.ma60)} 與 20 日報酬率 "
+        f"{fmt_number(context.return_20d, suffix='%')}；基本面參考 EPS {fmt_number(context.eps)}、"
+        f"本益比 {fmt_number(context.pe_ratio)} 與月營收成長 {fmt_number(context.revenue_growth, suffix='%')}；"
+        f"籌碼面參考外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}、三大法人合計 "
+        f"{fmt_number(context.institutional_net_buy, decimals=0)} 與融資餘額變化 "
+        f"{fmt_number(context.margin_balance_change, decimals=0)}。建議後續觀察均線是否延續、"
+        f"月營收與 EPS 是否改善，以及法人買賣超和融資變化是否支持目前方向；本系統不構成交易建議。"
+    )
     decision = DecisionSummary(
         supportReasons=bullish_reasons or ["目前可用資料尚不足以形成明確偏多理由。"],
         risks=risk_items or ["未出現重大規則式風險，但仍需注意資料延遲與市場波動。"],
         watchPoints=unique_items(watch_points),
+        recommendationText=recommendation_text,
     )
+    evidence = [
+        f"加權分數：{weighted_score:.2f}",
+        f"技術面立場：{prior_agents[0].stance if len(prior_agents) > 0 else '資料暫無'}",
+        f"基本面立場：{prior_agents[1].stance if len(prior_agents) > 1 else '資料暫無'}",
+        f"籌碼面立場：{prior_agents[2].stance if len(prior_agents) > 2 else '資料暫無'}",
+        f"風險控管立場：{prior_agents[3].stance if len(prior_agents) > 3 else '資料暫無'}",
+    ]
+    degraded = any(agent.degraded for agent in prior_agents)
     agent = AgentInsight(
         name="總結決策 Agent",
         role="整合技術、基本面、籌碼與風險控管觀點",
         stance=rating,
         confidence=confidence,
         summary=f"加權整合後的規則式結論為「{rating}」，不構成買賣建議。",
+        narrative=recommendation_text,
+        evidence=evidence,
+        degraded=degraded,
         reasons=decision.supportReasons,
         risks=decision.risks,
     )
@@ -318,6 +418,7 @@ def safe_decision_agent(context, agents: list[AgentInsight]) -> tuple[AgentInsig
             supportReasons=["目前可用資料尚不足以形成明確偏多理由。"],
             risks=fallback.risks,
             watchPoints=["請稍後重試，或檢查資料來源與網路狀態。"],
+            recommendationText="總結決策發生降級，目前僅能採中立觀察，請稍後重試或檢查資料來源。",
         )
         return fallback, summary, "中立"
 
@@ -329,6 +430,9 @@ def fallback_agent(name: str, message: str, exc: Exception) -> AgentInsight:
         stance="中立",
         confidence=0.12,
         summary=message,
+        narrative=f"{name} 無法完成完整規則式分析，原因為 {type(exc).__name__}；目前以資料不足處理並採中立觀察。",
+        evidence=["資料不足"],
+        degraded=True,
         reasons=["資料不足"],
         risks=[f"{message} 錯誤類型：{type(exc).__name__}"],
     )

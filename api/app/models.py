@@ -56,6 +56,9 @@ class AgentInsight(BaseModel):
     stance: Rating
     confidence: float = Field(..., ge=0, le=1)
     summary: str
+    narrative: str
+    evidence: list[str]
+    degraded: bool = False
     reasons: list[str]
     risks: list[str]
 
@@ -71,6 +74,7 @@ class DecisionSummary(BaseModel):
     supportReasons: list[str]
     risks: list[str]
     watchPoints: list[str]
+    recommendationText: str
 
 
 class DataSourceStatus(BaseModel):

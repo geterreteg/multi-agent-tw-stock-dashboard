@@ -108,17 +108,33 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle>{agent.name}</CardTitle>
-                  <Badge className={stanceBadgeClass(agent.stance)}>{agent.stance}</Badge>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {agent.degraded ? <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">資料降級</Badge> : null}
+                    <Badge className={stanceBadgeClass(agent.stance)}>{agent.stance}</Badge>
+                  </div>
                 </div>
                 <p className="text-sm text-slate-400">{agent.role}</p>
               </CardHeader>
               <CardContent>
                 <p className="text-sm leading-7 text-slate-300">{agent.summary}</p>
+                <p className="mt-4 rounded-2xl border border-white/[.06] bg-white/[.03] p-4 text-sm leading-7 text-slate-300">
+                  {agent.narrative}
+                </p>
                 <div className="mt-5 flex items-center gap-3">
                   <div className="h-2 flex-1 rounded-full bg-white/[.07]">
                     <div className="h-full rounded-full bg-cyan-300/75" style={{ width: `${agent.confidence * 100}%` }} />
                   </div>
                   <span className="text-sm font-semibold text-cyan-100">{Math.round(agent.confidence * 100)}%</span>
+                </div>
+                <div className="mt-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">使用數據</p>
+                  <ul className="mt-3 grid gap-2 text-sm text-slate-400 sm:grid-cols-2">
+                    {agent.evidence.map((item) => (
+                      <li key={item} className="rounded-xl border border-white/[.06] bg-white/[.025] px-3 py-2">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
                 <ul className="mt-5 space-y-2 text-sm text-slate-400">
                   {agent.reasons.map((reason) => (
@@ -160,6 +176,11 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         <DecisionColumn title="支持理由" items={data.decision.supportReasons} />
         <DecisionColumn title="主要風險" items={data.decision.risks} tone="risk" />
         <DecisionColumn title="觀察重點" items={data.decision.watchPoints} />
+      </section>
+
+      <section className="rounded-3xl border border-cyan-300/10 bg-cyan-300/[.045] p-6">
+        <h2 className="text-lg font-semibold text-white">總結觀察建議</h2>
+        <p className="mt-3 text-sm leading-7 text-slate-300">{data.decision.recommendationText}</p>
       </section>
 
       <section className="rounded-3xl border border-white/[.08] bg-white/[.04] p-6">
