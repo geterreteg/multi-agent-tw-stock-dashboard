@@ -12,3 +12,5 @@ api/.env
 next-dashboard/.env.local
 next-dashboard/.next/
 next-dashboard/node_modules/
+
+.vercel
