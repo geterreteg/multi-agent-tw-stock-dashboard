@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BarChart3, FlaskConical, Home, Settings, Sparkles } from "lucide-react";
 
+import { MobileTopBar } from "@/components/mobile-top-bar";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,6 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-Hant" className="dark">
       <body>
+        <MobileTopBar />
         <div className="relative mx-auto flex min-h-screen max-w-[1500px]">
           <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/[.08] bg-slate-950/35 p-6 backdrop-blur-xl lg:block">
             <Link href="/" className="flex items-center gap-3">
@@ -46,7 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </nav>
             <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/[.08] bg-white/[.04] p-4">
               <p className="text-sm font-semibold text-emerald-200">系統狀態</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">新版骨架運行中，資料為示範資料。</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">已串接 FastAPI 分析後端，投資結論僅供課程研究與參考。</p>
             </div>
           </aside>
           <main className="w-full px-5 py-6 sm:px-8 lg:px-10">{children}</main>

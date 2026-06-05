@@ -25,7 +25,7 @@ export default function DashboardHome() {
               多 Agent 台股智慧分析儀表板
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300">
-              整合價格、籌碼、基本面與多代理人觀點，快速產生可解釋的投資分析摘要。
+              串接 FastAPI 分析後端，整合價格、基本面、籌碼與多 Agent 評分，快速產生可解釋的台股研究摘要。
             </p>
             <div className="mt-8">
               <SearchBox />
@@ -44,8 +44,8 @@ export default function DashboardHome() {
           </div>
           <div className="rounded-[1.75rem] border border-cyan-300/15 bg-slate-950/50 p-5">
             <div className="mb-4 flex items-center justify-between">
-              <Badge>產品預覽</Badge>
-              <span className="text-xs text-slate-500">示範資料</span>
+              <Badge>分析快照</Badge>
+              <span className="text-xs text-slate-500">課程研究用途</span>
             </div>
             <div className="space-y-4">
               <PreviewRow label="台積電" value="中立" delta="+4.2%" />
@@ -57,10 +57,10 @@ export default function DashboardHome() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatusCard icon={Activity} label="API 狀態" value="正常" detail="FastAPI 示範後端可供前端串接。" />
-        <StatusCard icon={Database} label="資料來源" value="示範資料" detail="下一階段接回 yfinance 與 FinMind。" />
-        <StatusCard icon={Clock3} label="最後更新時間" value="2026/06/04 18:00" detail="示範資料時間戳。" />
-        <StatusCard icon={Boxes} label="分析模組狀態" value="5 / 5 正常" detail="多 Agent 卡片與決策摘要已就緒。" />
+        <StatusCard icon={Activity} label="API 狀態" value="已連線" detail="前端透過 FastAPI 取得分析結果。" />
+        <StatusCard icon={Database} label="資料來源" value="雙來源整合" detail="價格資料、基本面與籌碼資料統一進入分析流程。" />
+        <StatusCard icon={Clock3} label="資料時效" value="依來源更新" detail="資料可能延遲或不完整，不宣稱完全即時。" />
+        <StatusCard icon={Boxes} label="分析模組" value="多 Agent 評分" detail="技術面、基本面、籌碼面與風險控管共同形成結論。" />
       </section>
 
       <AgentFlow />
@@ -68,8 +68,10 @@ export default function DashboardHome() {
       <section className="rounded-3xl border border-white/[.08] bg-white/[.04] p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <h2 className="text-xl font-semibold text-white">準備進入新版分析頁</h2>
-            <p className="mt-2 text-sm text-slate-400">先用示範資料驗證作品集等級 UI，下一階段再接回真實 Python 分析邏輯。</p>
+            <h2 className="text-xl font-semibold text-white">產出可解釋的台股研究摘要</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              系統以規則式多 Agent 彙整資料與風險觀點，分析結果僅供課程研究與投資參考，不構成任何買賣建議。
+            </p>
           </div>
           <Link href="/stocks/2330" className={cn(buttonVariants(), "flex items-center gap-2")}>
             查看 2330 分析
