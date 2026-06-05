@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, Download, GaugeCircle, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, Download, FileText, GaugeCircle, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
 
 import { KpiCard } from "@/components/analysis/kpi-card";
 import { StockCharts } from "@/components/charts/stock-charts";
@@ -133,66 +133,27 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           {data.agents.map((agent) => (
-            <Card key={agent.name}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle>{agent.name}</CardTitle>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {agent.degraded ? <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">資料降級</Badge> : null}
-                    <Badge className={stanceBadgeClass(agent.stance)}>{agent.stance}</Badge>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-400">{agent.role}</p>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-7 text-slate-300">{agent.summary}</p>
-                <p className="mt-4 rounded-2xl border border-white/[.06] bg-white/[.03] p-4 text-sm leading-7 text-slate-300">
-                  {agent.narrative}
-                </p>
-                <div className="mt-5 flex items-center gap-3">
-                  <div className="h-2 flex-1 rounded-full bg-white/[.07]">
-                    <div className="h-full rounded-full bg-cyan-300/75" style={{ width: `${agent.confidence * 100}%` }} />
-                  </div>
-                  <span className="text-sm font-semibold text-cyan-100">{Math.round(agent.confidence * 100)}%</span>
-                </div>
-                <div className="mt-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">使用數據</p>
-                  <ul className="mt-3 grid gap-2 text-sm text-slate-400 sm:grid-cols-2">
-                    {agent.evidence.map((item) => (
-                      <li key={item} className="rounded-xl border border-white/[.06] bg-white/[.025] px-3 py-2">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <ul className="mt-5 space-y-2 text-sm text-slate-400">
-                  {agent.reasons.map((reason) => (
-                    <li key={reason}>- {reason}</li>
-                  ))}
-                </ul>
-                {agent.risks.length > 0 ? (
-                  <div className="mt-5 rounded-2xl border border-amber-300/10 bg-amber-300/[.04] p-3 text-sm leading-7 text-amber-100/80">
-                    {agent.risks.slice(0, 2).map((risk) => (
-                      <p key={risk}>風險：{risk}</p>
-                    ))}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
+            <AgentInsightCard key={agent.name} agent={agent} />
           ))}
         </div>
       </section>
 
-      <section className="rounded-3xl border border-white/[.08] bg-white/[.035] p-6">
-        <div className="mb-5 flex items-center gap-2 text-white">
-          <MessageSquareText className="h-5 w-5 text-cyan-200" />
-          <h2 className="text-xl font-semibold">Agent 辯論室</h2>
+      <section className="rounded-3xl border border-white/[.08] bg-white/[.035] p-6 shadow-glass">
+        <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div className="flex items-center gap-2 text-white">
+            <MessageSquareText className="h-5 w-5 text-cyan-200" />
+            <h2 className="text-xl font-semibold">Agent 辯論室</h2>
+          </div>
+          <p className="text-sm text-slate-500">支持觀點、反方風險與決策整合分層呈現</p>
         </div>
-        <div className="space-y-3">
+        <div className="grid gap-3">
           {data.debate.map((item) => (
             <div key={`${item.speaker}-${item.message}`} className={debateBubbleClass(item.tone)}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-white">{item.speaker}</span>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-white">{item.speaker}</span>
+                  <span className={debateToneLabelClass(item.tone)}>{debateToneLabel(item.tone)}</span>
+                </div>
                 <Badge className={stanceBadgeClass(item.stance)}>{item.stance}</Badge>
               </div>
               <p className="mt-2 text-sm leading-7 text-slate-300">{item.message}</p>
@@ -207,10 +168,7 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         <DecisionColumn title="觀察重點" items={data.decision.watchPoints} />
       </section>
 
-      <section className="rounded-3xl border border-cyan-300/10 bg-cyan-300/[.045] p-6">
-        <h2 className="text-lg font-semibold text-white">總結觀察建議</h2>
-        <p className="mt-3 text-sm leading-7 text-slate-300">{data.decision.recommendationText}</p>
-      </section>
+      <ResearchSummaryCard data={data} />
 
       <section className="rounded-3xl border border-white/[.08] bg-white/[.04] p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -239,10 +197,134 @@ function stanceBadgeClass(stance: string) {
 
 function debateBubbleClass(tone: string) {
   const base = "rounded-2xl border p-4";
-  if (tone === "support") return `${base} border-emerald-300/10 bg-emerald-300/[.04]`;
-  if (tone === "risk") return `${base} border-amber-300/10 bg-amber-300/[.04]`;
-  if (tone === "summary") return `${base} border-cyan-300/15 bg-cyan-300/[.06]`;
+  if (tone === "support") return `${base} border-emerald-300/15 bg-emerald-300/[.045]`;
+  if (tone === "risk") return `${base} border-amber-300/15 bg-amber-300/[.05]`;
+  if (tone === "summary") return `${base} border-cyan-300/20 bg-cyan-300/[.075] shadow-glass`;
   return `${base} border-white/[.06] bg-white/[.035]`;
+}
+
+function debateToneLabel(tone: string) {
+  if (tone === "support") return "支持觀點";
+  if (tone === "risk") return "反方風險";
+  if (tone === "summary") return "決策整合";
+  return "中性觀察";
+}
+
+function debateToneLabelClass(tone: string) {
+  const base = "rounded-full px-2.5 py-1 text-xs font-semibold";
+  if (tone === "support") return `${base} bg-emerald-300/10 text-emerald-100`;
+  if (tone === "risk") return `${base} bg-amber-300/10 text-amber-100`;
+  if (tone === "summary") return `${base} bg-cyan-300/10 text-cyan-100`;
+  return `${base} bg-white/[.06] text-slate-300`;
+}
+
+function AgentInsightCard({ agent }: { agent: AnalyzeResponse["agents"][number] }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b border-white/[.06] pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>{agent.name}</CardTitle>
+            <p className="mt-2 text-sm leading-6 text-slate-500">{agent.role}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            {agent.degraded ? <Badge className="border-amber-300/20 bg-amber-300/10 text-amber-100">資料降級</Badge> : null}
+            <Badge className={stanceBadgeClass(agent.stance)}>{agent.stance}</Badge>
+          </div>
+        </div>
+        <div className="grid gap-3 pt-3 sm:grid-cols-2">
+          <AgentMetric label="score" value={formatScore(agent.score)} tone={agent.score > 0 ? "positive" : agent.score < 0 ? "risk" : "neutral"} />
+          <AgentMetric label="confidence" value={`${Math.round(agent.confidence * 100)}%`} tone="neutral" />
+        </div>
+      </CardHeader>
+      <CardContent className="pt-5">
+        <p className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[.045] p-4 text-sm leading-7 text-slate-200">{agent.narrative}</p>
+        <div className="mt-5 flex items-center gap-3">
+          <div className="h-2 flex-1 rounded-full bg-white/[.07]">
+            <div className="h-full rounded-full bg-cyan-300/75" style={{ width: `${agent.confidence * 100}%` }} />
+          </div>
+          <span className="text-xs font-semibold text-cyan-100">信心程度</span>
+        </div>
+
+        <div className="mt-5 grid gap-3 xl:grid-cols-3">
+          <AgentDetailGroup title="使用數據" items={agent.evidence} />
+          <AgentDetailGroup title="主要理由" items={agent.reasons} />
+          <AgentDetailGroup title="風險提醒" items={agent.risks} tone="risk" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgentMetric({ label, value, tone }: { label: string; value: string; tone: "positive" | "risk" | "neutral" }) {
+  const toneClass = tone === "positive" ? "text-emerald-100" : tone === "risk" ? "text-amber-100" : "text-cyan-100";
+
+  return (
+    <div className="rounded-2xl border border-white/[.06] bg-slate-950/35 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function AgentDetailGroup({ title, items, tone = "default" }: { title: string; items: string[]; tone?: "default" | "risk" }) {
+  const visibleItems = items.length > 0 ? items.slice(0, 3) : ["資料暫無"];
+
+  return (
+    <div className={`rounded-2xl border p-3 ${tone === "risk" ? "border-amber-300/10 bg-amber-300/[.035]" : "border-white/[.06] bg-white/[.025]"}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</p>
+      <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+        {visibleItems.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ResearchSummaryCard({ data }: { data: AnalyzeResponse }) {
+  return (
+    <section className="overflow-hidden rounded-3xl border border-cyan-300/15 bg-cyan-300/[.045] shadow-glass">
+      <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
+        <div className="p-6">
+          <div className="flex items-center gap-2 text-cyan-100">
+            <FileText className="h-5 w-5" />
+            <h2 className="text-lg font-semibold text-white">綜合研究摘要</h2>
+          </div>
+          <p className="mt-4 text-sm leading-8 text-slate-200">{data.decision.recommendationText}</p>
+          <p className="mt-4 text-xs leading-5 text-slate-500">本摘要僅供課程研究與投資參考，不構成任何買賣建議。</p>
+        </div>
+        <aside className="border-t border-white/[.08] bg-slate-950/35 p-6 lg:border-l lg:border-t-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">研究資訊</p>
+          <dl className="mt-4 space-y-4 text-sm">
+            <div>
+              <dt className="text-slate-500">最後更新</dt>
+              <dd className="mt-1 font-medium text-white">{data.lastUpdated}</dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">綜合評級</dt>
+              <dd className="mt-1">
+                <Badge className={stanceBadgeClass(data.rating)}>{data.rating}</Badge>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">資料來源</dt>
+              <dd className="mt-2 flex flex-wrap gap-2">
+                {(data.sources ?? []).map((source) => (
+                  <Badge
+                    key={`${source.name}-${source.status}`}
+                    className={isSourceDegraded(source) ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"}
+                  >
+                    {source.name}
+                  </Badge>
+                ))}
+              </dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+  );
 }
 
 function DecisionColumn({ title, items, tone = "default" }: { title: string; items: string[]; tone?: "default" | "risk" }) {
