@@ -30,13 +30,18 @@ export default function DashboardHome() {
             <div id="stock-search" className="mt-8 scroll-mt-24">
               <SearchBox />
             </div>
-            <p className="mt-3 text-sm text-slate-500">請先輸入股票代號並按下開始分析，系統才會進入個股分析頁。</p>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              輸入台股代號，系統將整合價格、基本面、籌碼與多 Agent 評分產生研究摘要。
+            </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {demos.map((demo) => (
                 <Link
                   key={demo.symbol}
                   href={`/stocks/${demo.symbol}`}
-                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
+                  className={cn(
+                    buttonVariants({ variant: "secondary", size: "sm" }),
+                    "border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.075] hover:text-white"
+                  )}
                 >
                   範例分析：{demo.symbol} {demo.name}
                 </Link>

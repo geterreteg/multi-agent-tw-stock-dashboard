@@ -8,14 +8,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "多 Agent 台股智慧分析儀表板",
-  description: "Next.js + FastAPI 新版金融科技儀表板。",
+  description: "整合價格、基本面、籌碼與多 Agent 評分的台股研究分析儀表板。",
 };
 
 const nav = [
   { href: "/", label: "首頁總覽", icon: Home },
   { href: "/#stock-search", label: "股票分析", icon: BarChart3 },
-  { href: "/backtest", label: "回測結果", icon: FlaskConical },
-  { href: "/events", label: "事件研究", icon: Sparkles },
+  { href: "/backtest", label: "回測結果規劃中", icon: FlaskConical },
+  { href: "/events", label: "事件研究規劃中", icon: Sparkles },
   { href: "/settings", label: "設定", icon: Settings },
 ];
 
