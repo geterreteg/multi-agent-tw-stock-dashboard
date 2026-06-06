@@ -27,9 +27,10 @@ export default function DashboardHome() {
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300">
               串接 FastAPI 分析後端，整合價格、基本面、籌碼與多 Agent 評分，快速產生可解釋的台股研究摘要。
             </p>
-            <div className="mt-8">
+            <div id="stock-search" className="mt-8 scroll-mt-24">
               <SearchBox />
             </div>
+            <p className="mt-3 text-sm text-slate-500">請先輸入股票代號並按下開始分析，系統才會進入個股分析頁。</p>
             <div className="mt-5 flex flex-wrap gap-3">
               {demos.map((demo) => (
                 <Link
@@ -37,7 +38,7 @@ export default function DashboardHome() {
                   href={`/stocks/${demo.symbol}`}
                   className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >
-                  {demo.symbol} {demo.name}
+                  範例分析：{demo.symbol} {demo.name}
                 </Link>
               ))}
             </div>
@@ -73,8 +74,8 @@ export default function DashboardHome() {
               系統以規則式多 Agent 彙整資料與風險觀點，分析結果僅供課程研究與投資參考，不構成任何買賣建議。
             </p>
           </div>
-          <Link href="/stocks/2330" className={cn(buttonVariants(), "flex items-center gap-2")}>
-            查看 2330 分析
+          <Link href="/#stock-search" className={cn(buttonVariants(), "flex items-center gap-2")}>
+            輸入股票代號
             <ShieldCheck className="h-4 w-4" />
           </Link>
         </div>

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 const nav = [
   { href: "/", label: "首頁總覽", icon: Home },
-  { href: "/stocks/2330", label: "股票分析", icon: BarChart3 },
+  { href: "/#stock-search", label: "股票分析", icon: BarChart3 },
   { href: "/backtest", label: "回測結果", icon: FlaskConical },
   { href: "/events", label: "事件研究", icon: Sparkles },
   { href: "/settings", label: "設定", icon: Settings },

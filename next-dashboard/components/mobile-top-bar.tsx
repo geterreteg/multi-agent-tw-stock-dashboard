@@ -37,10 +37,10 @@ export function MobileTopBar() {
             首頁
           </Link>
           <Link
-            href="/stocks/2330"
+            href="/#stock-search"
             className="inline-flex h-9 items-center rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 text-xs font-semibold text-cyan-100"
           >
-            2330
+            分析
           </Link>
         </nav>
       </div>

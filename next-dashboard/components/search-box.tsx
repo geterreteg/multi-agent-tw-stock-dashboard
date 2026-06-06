@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 
 export function SearchBox() {
   const router = useRouter();
-  const [symbol, setSymbol] = useState("2330");
+  const [symbol, setSymbol] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
