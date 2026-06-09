@@ -97,3 +97,77 @@ streamlit run app.py
 ## Required Disclaimer
 
 本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。投資人仍應自行評估風險並承擔投資結果。
+
+## General rules
+
+- Use minimal, targeted changes.
+- Do not refactor unrelated code.
+- Do not rewrite large files unless necessary.
+- Do not change unrelated UI, routes, API logic, environment variables, deployment settings, or package versions unless the task asks for it.
+- Keep all user-facing UI text in Traditional Chinese.
+- Do not invent data, scores, financial metrics, citations, or analysis results.
+- Never commit secrets, API keys, tokens, `.env`, or private credentials.
+- Prefer simple, maintainable solutions over clever or over-engineered ones.
+
+## Task routing
+
+Before acting, silently classify the task as S, M, or L.
+
+S = text, style, copywriting, small UI, config typo, or one-file change.  
+M = normal bug fix, small feature, UI section change, API field wiring, or limited multi-file change.  
+L = build failure, deployment issue, data-flow issue, architecture change, security/privacy issue, investment scoring logic, or anything that may affect correctness across the app.
+
+## Workflow
+
+### S tasks
+
+- Inspect only directly relevant files.
+- Make the smallest safe change.
+- Do not refactor.
+- Do not run broad searches unless necessary.
+- Verify with the narrowest reasonable check.
+
+### M tasks
+
+- Inspect relevant neighboring files.
+- Make focused changes.
+- Avoid unrelated cleanup.
+- Run the relevant lint, typecheck, test, or build command if available.
+
+### L tasks
+
+- First understand the current architecture, data flow, or error path.
+- Identify risks and assumptions before editing.
+- Make a short plan before implementation.
+- Implement in small steps.
+- Verify with build, test, lint, or typecheck when available.
+- If build/deployment fails, use the actual error message as the source of truth.
+- Do not guess or make unrelated changes to silence errors.
+
+## Investment analysis rules
+
+- If data is missing or incomplete, clearly show the data gap.
+- Do not fabricate confidence scores, ratings, financial numbers, or valuation conclusions.
+- If evidence is weak, keep the recommendation neutral or conservative.
+- Separate facts, assumptions, and model-generated judgments.
+- Do not present generated analysis as professional investment advice.
+
+## Verification rules
+
+- Prefer existing project commands from `package.json`, README, or existing scripts.
+- Do not introduce new dependencies unless necessary.
+- Do not run long-lived dev servers unless explicitly needed.
+- If verification cannot be completed, explain why.
+
+## Final response
+
+For Medium or Large tasks, include:
+
+- Difficulty: S/M/L
+- Files changed
+- Verification performed
+- Remaining risks
+
+For very small tasks, use a concise summary instead of a fixed full format.
+For small tasks, mention the files actually changed and any necessary verification.
+Do not force every response into the complete fixed format when it would be unnecessary.
