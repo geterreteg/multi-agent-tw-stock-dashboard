@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { Activity, Boxes, Clock3, Database, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { AgentFlow } from "@/components/dashboard/agent-flow";
 import { StatusCard } from "@/components/dashboard/status-card";
 import { SearchBox } from "@/components/search-box";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -16,49 +15,80 @@ const demos = [
 
 export default function DashboardHome() {
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/[.09] bg-white/[.045] p-8 shadow-glass backdrop-blur-xl lg:p-12">
-        <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-cyan-300/10 blur-3xl" />
-        <div className="relative grid gap-10 lg:grid-cols-[1.05fr_.95fr] lg:items-center">
-          <div>
-            <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              多 Agent 台股智慧分析儀表板
+    <div className="space-y-10">
+      <section className="relative isolate overflow-hidden border-b border-white/[.08] pb-12 pt-8 sm:pb-16 lg:min-h-[calc(100vh-3rem)] lg:pb-20 lg:pt-12">
+        <div className="absolute inset-x-[-6%] top-12 -z-10 h-px bg-gradient-to-r from-transparent via-[rgba(217,204,166,.34)] to-transparent" />
+        <div className="absolute left-[-16%] top-[-18%] -z-10 h-[30rem] w-[30rem] rounded-full bg-[rgba(217,204,166,.16)] blur-3xl" />
+        <div className="absolute right-[-12%] top-12 -z-10 h-[28rem] w-[28rem] rounded-full bg-[rgba(104,176,169,.16)] blur-3xl" />
+        <div className="absolute bottom-[-20%] right-[18%] -z-10 h-72 w-72 rounded-full bg-[rgba(244,241,232,.08)] blur-3xl" />
+        <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(217,204,166,.035)_1px,transparent_1px),linear-gradient(rgba(217,204,166,.028)_1px,transparent_1px)] bg-[size:84px_84px] opacity-80" />
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.12fr)_minmax(340px,.88fr)] lg:items-end">
+          <div className="max-w-5xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[rgba(199,183,143,.78)]">
+              Taiwan equity research workflow
+            </p>
+            <h1 className="mt-7 max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-[rgb(244,241,232)] sm:text-5xl lg:text-6xl">
+              把台股分析，拆成可解釋的研究流程
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300">
-              串接 FastAPI 分析後端，整合價格、基本面、籌碼與多 Agent 評分，快速產生可解釋的台股研究摘要。
+              輸入台股代號，系統會整合價格、基本面、籌碼與風險觀點，整理成一份可追溯的多 Agent 研究摘要。
             </p>
-            <div id="stock-search" className="mt-8 scroll-mt-24">
+            <div id="stock-search" className="mt-10 scroll-mt-24">
               <SearchBox />
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              輸入台股代號，系統將整合價格、基本面、籌碼與多 Agent 評分產生研究摘要。
+            <p className="mt-4 max-w-2xl border-l border-[rgba(199,183,143,.34)] pl-4 text-xs leading-6 text-slate-500">
+              資料可能延遲或不完整；本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。
             </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {demos.map((demo) => (
-                <Link
-                  key={demo.symbol}
-                  href={`/stocks/${demo.symbol}`}
-                  className={cn(
-                    buttonVariants({ variant: "secondary", size: "sm" }),
-                    "border-white/[.08] bg-white/[.035] text-slate-300 hover:bg-white/[.075] hover:text-white"
-                  )}
-                >
-                  範例分析：{demo.symbol} {demo.name}
-                </Link>
-              ))}
+            <div className="mt-7">
+              <p className="text-xs font-medium tracking-[0.18em] text-slate-500">範例標的</p>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                {demos.map((demo) => (
+                  <Link
+                    key={demo.symbol}
+                    href={`/stocks/${demo.symbol}`}
+                    className="group inline-flex items-baseline gap-2 border-b border-white/10 pb-1 text-slate-500 transition hover:border-[rgba(199,183,143,.55)] hover:text-[rgb(229,218,190)]"
+                  >
+                    <span className="font-mono text-xs tabular-nums tracking-[0.18em]">{demo.symbol}</span>
+                    <span>{demo.name}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="rounded-[1.75rem] border border-cyan-300/15 bg-slate-950/50 p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <Badge>分析快照</Badge>
-              <span className="text-xs text-slate-500">課程研究用途</span>
+          <aside className="relative min-h-[430px] overflow-hidden border border-white/[.08] bg-[rgba(9,13,16,.52)] p-5 shadow-[0_30px_120px_rgba(0,0,0,.28)] backdrop-blur-md sm:p-6">
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(217,204,166,.045)_1px,transparent_1px),linear-gradient(rgba(217,204,166,.038)_1px,transparent_1px)] bg-[size:48px_48px]" />
+            <div className="absolute right-[-18%] top-[-14%] h-64 w-64 rounded-full bg-[rgba(132,190,184,.16)] blur-3xl" />
+            <div className="absolute left-6 top-20 h-52 w-[72%] rotate-[-3deg] border border-[rgba(217,204,166,.22)] bg-[rgba(248,244,232,.08)]" />
+            <div className="absolute bottom-12 right-5 h-48 w-[74%] rotate-[2deg] border border-white/[.08] bg-[rgba(248,244,232,.045)]" />
+            <div className="relative flex items-start justify-between gap-6 border-b border-white/[.08] pb-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Research note</p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[rgb(244,241,232)]">市場觀察票據</h2>
+              </div>
+              <span className="border border-[rgba(199,183,143,.35)] bg-[rgba(199,183,143,.08)] px-3 py-1 text-xs text-[rgb(229,218,190)]">
+                demo
+              </span>
             </div>
-            <div className="space-y-4">
-              <PreviewRow label="台積電" value="中立" delta="+4.2%" />
+            <div className="relative mt-5 grid grid-cols-3 gap-2 text-xs">
+              <span className="border border-white/[.08] bg-white/[.035] px-3 py-2 text-slate-400">Price</span>
+              <span className="border border-[rgba(132,190,184,.2)] bg-[rgba(132,190,184,.06)] px-3 py-2 text-[rgb(184,218,213)]">Quality</span>
+              <span className="border border-[rgba(199,183,143,.22)] bg-[rgba(199,183,143,.06)] px-3 py-2 text-[rgb(229,218,190)]">Risk</span>
+            </div>
+            <div className="relative my-7 h-24 border-y border-white/[.07]">
+              <div className="absolute left-0 top-1/2 h-px w-full bg-[rgba(217,204,166,.12)]" />
+              <div className="absolute bottom-5 left-[8%] h-8 w-px bg-[rgba(132,190,184,.45)]" />
+              <div className="absolute bottom-5 left-[24%] h-12 w-px bg-[rgba(132,190,184,.28)]" />
+              <div className="absolute bottom-5 left-[44%] h-16 w-px bg-[rgba(217,204,166,.34)]" />
+              <div className="absolute bottom-5 left-[63%] h-10 w-px bg-[rgba(132,190,184,.34)]" />
+              <div className="absolute bottom-5 left-[82%] h-14 w-px bg-[rgba(217,204,166,.24)]" />
+              <div className="absolute left-[8%] top-9 h-px w-[74%] bg-gradient-to-r from-[rgba(132,190,184,.12)] via-[rgba(132,190,184,.52)] to-[rgba(217,204,166,.22)]" />
+            </div>
+            <div className="relative divide-y divide-white/[.07]">
+              <PreviewRow label="台積電" value="Neutral / 中性" delta="+4.2%" />
               <PreviewRow label="鴻海" value="觀察" delta="+1.8%" />
-              <PreviewRow label="聯發科" value="偏多" delta="+6.1%" />
+              <PreviewRow label="聯發科" value="Buy / 看多" delta="+6.1%" />
             </div>
-          </div>
+          </aside>
         </div>
       </section>
 
@@ -91,12 +121,12 @@ export default function DashboardHome() {
 
 function PreviewRow({ label, value, delta }: { label: string; value: string; delta: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/[.08] bg-white/[.04] p-4">
+    <div className="flex items-center justify-between gap-4 py-4">
       <div>
-        <p className="font-medium text-white">{label}</p>
-        <p className="mt-1 text-sm text-slate-500">多 Agent 評級：{value}</p>
+        <p className="font-medium text-[rgb(18,24,25)]">{label}</p>
+        <p className="mt-1 text-xs text-[rgba(31,42,43,.48)]">多 Agent 評級：{value}</p>
       </div>
-      <span className="text-sm font-semibold text-emerald-200">{delta}</span>
+      <span className="font-mono text-sm font-semibold tabular-nums text-[rgb(28,101,91)]">{delta}</span>
     </div>
   );
 }

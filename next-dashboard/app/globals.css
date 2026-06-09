@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 96%;
-  --border: 215 25% 22%;
-  --muted: 215 18% 48%;
-  --accent: 188 90% 50%;
+  --background: 200 18% 5%;
+  --foreground: 42 34% 93%;
+  --border: 42 14% 22%;
+  --muted: 205 10% 48%;
+  --accent: 174 22% 57%;
 }
 
 * {
@@ -17,10 +17,11 @@
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 16% 8%, rgba(34, 211, 238, .16), transparent 30%),
-    radial-gradient(circle at 86% 0%, rgba(59, 130, 246, .18), transparent 30%),
-    linear-gradient(135deg, #070b13 0%, #0b1220 44%, #101827 100%);
-  color: #e2e8f0;
+    radial-gradient(circle at 78% 12%, rgba(132, 169, 164, .12), transparent 28%),
+    radial-gradient(circle at 12% 0%, rgba(199, 183, 143, .08), transparent 26%),
+    linear-gradient(135deg, #050708 0%, #090d10 48%, #101313 100%);
+  color: #e7e1d2;
+  font-variant-numeric: tabular-nums;
 }
 
 body::before {
@@ -29,12 +30,13 @@ body::before {
   inset: 0;
   content: "";
   background-image:
-    linear-gradient(rgba(148, 163, 184, .045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, .045) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(to bottom, black 0%, transparent 82%);
+    linear-gradient(rgba(199, 183, 143, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(199, 183, 143, .035) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, .045) .55px, transparent .55px);
+  background-size: 84px 84px, 84px 84px, 6px 6px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 78%);
 }
 
 ::selection {
-  background: rgba(34, 211, 238, .28);
+  background: rgba(199, 183, 143, .28);
 }

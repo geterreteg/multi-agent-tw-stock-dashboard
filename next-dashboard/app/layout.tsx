@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, FlaskConical, Home, Settings, Sparkles } from "lucide-react";
+import { BarChart3, Home } from "lucide-react";
 
 import { MobileTopBar } from "@/components/mobile-top-bar";
 
@@ -14,9 +14,6 @@ export const metadata: Metadata = {
 const nav = [
   { href: "/", label: "首頁總覽", icon: Home },
   { href: "/#stock-search", label: "股票分析", icon: BarChart3 },
-  { href: "/backtest", label: "回測結果規劃中", icon: FlaskConical },
-  { href: "/events", label: "事件研究規劃中", icon: Sparkles },
-  { href: "/settings", label: "設定", icon: Settings },
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
