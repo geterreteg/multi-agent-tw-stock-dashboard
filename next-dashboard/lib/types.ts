@@ -1,4 +1,9 @@
-export type Rating = "偏多" | "中立" | "偏空";
+export type Rating =
+  | "Strong Buy / 強烈看多"
+  | "Buy / 看多"
+  | "Neutral / 中性"
+  | "Sell / 看空"
+  | "Strong Sell / 強烈看空";
 
 export type MetricSnapshot = {
   latestClose: number | null;
@@ -63,12 +68,27 @@ export type AnalyzeResponse = {
   agents: AgentInsight[];
   debate: DebateMessage[];
   decision: {
+    rating?: Rating;
     supportReasons: string[];
     risks: string[];
     watchPoints: string[];
     recommendationText: string;
     finalScore: number;
     scoreBreakdown: Record<string, number>;
+    researchReport?: {
+      investmentThesis?: string[];
+      keyMetrics?: string[];
+      businessQuality?: string[];
+      financialAnalysis?: string[];
+      valuation?: string[];
+      catalysts?: string[];
+      risks?: string[];
+      variantView?: string[];
+      recommendation?: Rating;
+      confidenceScore?: number;
+      dataGaps?: string[];
+      scoreBreakdown?: Record<string, number>;
+    };
   };
   sources: Array<{
     name: string;
