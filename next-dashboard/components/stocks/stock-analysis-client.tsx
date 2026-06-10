@@ -16,6 +16,7 @@ const COURSE_RESEARCH_DISCLAIMER =
   "本系統僅供課程研究與資料分析展示，所有評級與建議皆為規則式模型輸出，不構成正式投資建議或獲利保證。";
 
 type ResearchReportView = {
+  isLegacyFallback: boolean;
   investmentThesis: string[];
   keyMetrics: string[];
   businessQuality: string[];
@@ -118,7 +119,12 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         <KpiCard label="外資買賣超" value={data.metrics.foreignBuy} signed />
       </section>
 
-      <ScoreBreakdown scoreBreakdown={scoreBreakdown} finalScore={finalScore} confidenceScore={researchReport.confidenceScore} />
+      <ScoreBreakdown
+        scoreBreakdown={scoreBreakdown}
+        finalScore={finalScore}
+        confidenceScore={researchReport.confidenceScore}
+        isLegacyFallback={researchReport.isLegacyFallback}
+      />
 
       <StockCharts data={data} />
 
@@ -230,7 +236,7 @@ function ResearchHeader({
           <dl className="mt-6 space-y-3 border-t border-current/20 pt-4 text-left text-xs leading-5 opacity-75">
             <div className="flex justify-between gap-3">
               <dt>信心</dt>
-              <dd className="font-medium">{formatConfidence(report.confidenceScore)}</dd>
+              <dd className="font-medium">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt>缺口</dt>
@@ -397,6 +403,11 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             <div>
               <CardTitle>投資結論</CardTitle>
               <p className="mt-3 text-sm leading-7 text-slate-300">{data.decision.recommendationText}</p>
+              {report.isLegacyFallback ? (
+                <p className="mt-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
+                  目前顯示舊版摘要；新版結構化研究報告需搭配升級後端。舊版 API 仍可顯示原始建議理由與既有分數，不代表系統故障。
+                </p>
+              ) : null}
               <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.045] p-3 text-xs leading-6 text-amber-100/85">
                 {COURSE_RESEARCH_DISCLAIMER}
               </p>
@@ -407,7 +418,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
               <dl className="mt-4 grid gap-3 text-xs">
                 <div>
                   <dt className="text-slate-500">信心分數</dt>
-                  <dd className="mt-1 font-mono text-2xl font-semibold text-white">{formatConfidence(report.confidenceScore)}</dd>
+                  <dd className="mt-1 font-mono text-2xl font-semibold text-white">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">資料缺口</dt>
@@ -629,10 +640,12 @@ function ScoreBreakdown({
   scoreBreakdown,
   finalScore,
   confidenceScore,
+  isLegacyFallback,
 }: {
   scoreBreakdown: Record<string, number>;
   finalScore: number | null;
   confidenceScore: number | null;
+  isLegacyFallback: boolean;
 }) {
   const items = [
     { label: "財務或價格表現", key: "financialOrPricePerformance", max: 25 },
@@ -654,6 +667,9 @@ function ScoreBreakdown({
             <h2 className="text-lg font-semibold text-white">研究評分拆解</h2>
           </div>
           <p className="mt-2 text-sm text-slate-400">總分 100 分，由財務或價格表現、成長性、估值、催化因素與風險控制組成。</p>
+          {isLegacyFallback ? (
+            <p className="mt-2 text-xs leading-5 text-cyan-100/75">目前顯示舊版摘要模式；新版結構化評分欄位需搭配升級後端。</p>
+          ) : null}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.06] px-4 py-3 text-right">
@@ -662,7 +678,9 @@ function ScoreBreakdown({
           </div>
           <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[.06] px-4 py-3 text-right">
             <p className="text-xs text-cyan-100/70">confidenceScore</p>
-            <p className="text-2xl font-semibold text-white">{confidenceScore === null ? "資料暫無" : `${confidenceScore}/100`}</p>
+            <p className="text-2xl font-semibold text-white">
+              {confidenceScore === null ? (isLegacyFallback ? "舊版資料來源未提供" : "資料暫無") : `${confidenceScore}/100`}
+            </p>
           </div>
         </div>
       </div>
@@ -674,7 +692,7 @@ function ScoreBreakdown({
                 <p className="font-medium text-white">{item.label}</p>
                 <p className="mt-1 text-xs text-slate-500">滿分 {item.max}</p>
               </div>
-              <span className="text-sm font-semibold text-cyan-100">{formatCategoryScore(item.score, item.max)}</span>
+              <span className="text-sm font-semibold text-cyan-100">{formatCategoryScore(item.score, item.max, isLegacyFallback)}</span>
             </div>
             <ScoreBar score={item.score} max={item.max} />
           </div>
@@ -706,6 +724,7 @@ function normalizeResearchReport(data: AnalyzeResponse): ResearchReportView {
     : "舊版 API 未提供 researchReport，已使用 recommendationText 與 scoreBreakdown 保守呈現。";
 
   return {
+    isLegacyFallback: !report,
     investmentThesis: safeStringList(report?.investmentThesis, [recommendationText]),
     keyMetrics: safeStringList(report?.keyMetrics, buildFallbackKeyMetrics(data)),
     businessQuality: safeStringList(report?.businessQuality, ["商業品質資料暫無完整回傳，需搭配後續財報與營收資料判讀。"]),
@@ -748,8 +767,9 @@ function ratingDisplayLabel(stance: string) {
   return stance || "Neutral｜中立觀察";
 }
 
-function formatConfidence(value: number | null) {
-  return value === null ? "資料暫無" : `${value}/100`;
+function formatConfidence(value: number | null, isLegacyFallback = false) {
+  if (value === null) return isLegacyFallback ? "舊版資料來源未提供" : "資料暫無";
+  return `${value}/100`;
 }
 
 function formatListSummary(items: string[]) {
@@ -781,8 +801,8 @@ function formatResearchScore(value: number | null) {
   return `${value.toFixed(1)}/100`;
 }
 
-function formatCategoryScore(value: number | null, max: number) {
-  if (value === null) return "資料暫無";
+function formatCategoryScore(value: number | null, max: number, isLegacyFallback = false) {
+  if (value === null) return isLegacyFallback ? "舊版未提供" : "資料暫無";
   return `${value.toFixed(1)}/${max}`;
 }
 
