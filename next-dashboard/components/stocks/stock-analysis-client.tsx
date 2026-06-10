@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Database, Download, FileText, GaugeCircle, Lightbulb, Loader2, MessageSquareText, Scale, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -14,6 +14,7 @@ import type { AnalyzeResponse } from "@/lib/types";
 
 const COURSE_RESEARCH_DISCLAIMER =
   "本系統僅供課程研究與資料分析展示，所有評級與建議皆為規則式模型輸出，不構成正式投資建議或獲利保證。";
+const RETRY_DELAY_MS = 1_500;
 
 type ResearchReportView = {
   isLegacyFallback: boolean;
@@ -34,32 +35,47 @@ type ResearchReportView = {
 export function StockAnalysisClient({ symbol }: { symbol: string }) {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCachedResult, setIsCachedResult] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const requestIdRef = useRef(0);
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadAnalysis() {
+  const loadAnalysis = useCallback(
+    async ({ allowAutoRetry = true }: { allowAutoRetry?: boolean } = {}) => {
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
       setIsLoading(true);
       setError(null);
       try {
-        const result = await analyzeStock(symbol);
-        if (!ignore) setData(result);
+        const result = await analyzeStockWithRetry(symbol, allowAutoRetry);
+        if (requestId !== requestIdRef.current) return;
+        writeCachedAnalysis(symbol, result);
+        setData(result);
+        setIsCachedResult(false);
       } catch (loadError) {
-        if (!ignore) {
+        if (requestId !== requestIdRef.current) return;
+        const cached = readCachedAnalysis(symbol);
+        if (cached) {
+          setData(cached);
+          setIsCachedResult(true);
+          setError(getAnalysisErrorMessage(loadError));
+        } else {
           setData(null);
-          setError(loadError instanceof Error ? loadError.message : "系統發生未知錯誤。");
+          setIsCachedResult(false);
+          setError("資料來源回應較慢，可能是後端冷啟動或外部資料暫時延遲。請稍後重新取得分析。");
         }
       } finally {
-        if (!ignore) setIsLoading(false);
+        if (requestId === requestIdRef.current) setIsLoading(false);
       }
-    }
+    },
+    [symbol],
+  );
 
+  useEffect(() => {
     loadAnalysis();
     return () => {
-      ignore = true;
+      requestIdRef.current += 1;
     };
-  }, [symbol]);
+  }, [loadAnalysis]);
 
   if (isLoading) {
     return (
@@ -77,6 +93,9 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         <AlertTriangle className="mb-4 h-8 w-8" />
         <h1 className="text-2xl font-semibold">暫時無法取得分析資料</h1>
         <p className="mt-3 text-sm leading-7 text-amber-100/80">{error}</p>
+        <Button className="mt-6" variant="secondary" onClick={() => loadAnalysis({ allowAutoRetry: false })}>
+          重新取得分析
+        </Button>
       </div>
     );
   }
@@ -93,6 +112,8 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
 
   return (
     <div className="space-y-8">
+      {isCachedResult ? <CachedAnalysisNotice onRetry={() => loadAnalysis({ allowAutoRetry: false })} /> : null}
+
       <ResearchHeader
         data={data}
         dataQualityLabel={dataQualityLabel}
@@ -189,6 +210,25 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         </div>
       </section>
     </div>
+  );
+}
+
+function CachedAnalysisNotice({ onRetry }: { onRetry: () => void }) {
+  return (
+    <section className="rounded-3xl border border-amber-300/20 bg-amber-300/[.055] p-5 text-amber-50">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-100" />
+          <div>
+            <h2 className="text-base font-semibold">目前顯示最近一次成功分析</h2>
+            <p className="mt-1 text-sm leading-6 text-amber-100/75">資料可能不是最新；後端可能正在冷啟動，或外部資料來源暫時延遲。</p>
+          </div>
+        </div>
+        <Button variant="secondary" onClick={onRetry}>
+          重新取得分析
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -714,6 +754,48 @@ function ScoreBar({ score, max }: { score: number | null; max: number }) {
       />
     </div>
   );
+}
+
+async function analyzeStockWithRetry(symbol: string, allowAutoRetry: boolean) {
+  try {
+    return await analyzeStock(symbol);
+  } catch (error) {
+    if (!allowAutoRetry) throw error;
+    await delay(RETRY_DELAY_MS);
+    return analyzeStock(symbol);
+  }
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function cacheKeyForSymbol(symbol: string) {
+  return `stock-analysis-cache-${symbol}`;
+}
+
+function readCachedAnalysis(symbol: string) {
+  try {
+    const cached = window.localStorage.getItem(cacheKeyForSymbol(symbol));
+    if (!cached) return null;
+    return JSON.parse(cached) as AnalyzeResponse;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAnalysis(symbol: string, data: AnalyzeResponse) {
+  try {
+    window.localStorage.setItem(cacheKeyForSymbol(symbol), JSON.stringify(data));
+  } catch {
+    // Cache is a display fallback only; storage failures should not block analysis.
+  }
+}
+
+function getAnalysisErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "資料來源回應較慢，可能是後端冷啟動或外部資料暫時延遲。";
 }
 
 function normalizeResearchReport(data: AnalyzeResponse): ResearchReportView {
