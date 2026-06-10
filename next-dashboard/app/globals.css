@@ -17,9 +17,10 @@
 body {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 78% 12%, rgba(132, 169, 164, .12), transparent 28%),
-    radial-gradient(circle at 12% 0%, rgba(199, 183, 143, .08), transparent 26%),
-    linear-gradient(135deg, #050708 0%, #090d10 48%, #101313 100%);
+    radial-gradient(circle at 76% 8%, rgba(132, 169, 164, .13), transparent 30%),
+    radial-gradient(circle at 18% 4%, rgba(199, 183, 143, .1), transparent 27%),
+    radial-gradient(circle at 62% 72%, rgba(80, 111, 108, .08), transparent 34%),
+    linear-gradient(135deg, #050708 0%, #090d10 46%, #101313 100%);
   color: #e7e1d2;
   font-variant-numeric: tabular-nums;
 }
@@ -30,13 +31,25 @@ body::before {
   inset: 0;
   content: "";
   background-image:
-    linear-gradient(rgba(199, 183, 143, .04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(199, 183, 143, .035) 1px, transparent 1px),
-    radial-gradient(rgba(255, 255, 255, .045) .55px, transparent .55px);
-  background-size: 84px 84px, 84px 84px, 6px 6px;
-  mask-image: linear-gradient(to bottom, black 0%, transparent 78%);
+    linear-gradient(rgba(199, 183, 143, .025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(199, 183, 143, .022) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 62%);
 }
 
 ::selection {
   background: rgba(199, 183, 143, .28);
+}
+
+.terminal-hero,
+.research-surface {
+  border-radius: 0;
+}
+
+.research-hairline {
+  background: linear-gradient(90deg, transparent, rgba(199, 183, 143, .34), transparent);
+}
+
+.text-balance {
+  text-wrap: balance;
 }

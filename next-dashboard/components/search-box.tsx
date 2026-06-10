@@ -22,11 +22,14 @@ export function SearchBox() {
 
   return (
     <form onSubmit={submit} className="w-full max-w-3xl">
-      <div className="relative overflow-hidden border border-[rgba(217,204,166,.36)] bg-[rgba(250,246,235,.94)] p-3 shadow-[0_24px_90px_rgba(0,0,0,.26),0_0_0_1px_rgba(255,255,255,.08)_inset] backdrop-blur-md">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(32,100,93,.45)] to-transparent" />
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
-          <span className="text-xs font-semibold tracking-[0.22em] text-[rgb(32,100,93)]">研究票據</span>
-          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[rgba(31,42,43,.48)]">TWSE / TPEX</span>
+      <div className="relative overflow-hidden border border-[rgba(217,204,166,.28)] bg-[rgba(235,232,221,.94)] p-3 shadow-[0_24px_80px_rgba(0,0,0,.26),0_0_0_1px_rgba(255,255,255,.1)_inset]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(39,98,91,.48)] to-transparent" />
+        <div className="mb-3 grid gap-2 px-1 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div>
+            <span className="text-xs font-semibold tracking-[0.22em] text-[rgb(27,82,77)]">RESEARCH COMMAND</span>
+            <p className="mt-1 text-xs text-[rgba(22,31,32,.68)]">輸入四位數台股代號，建立一份可追溯的研究摘要。</p>
+          </div>
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[rgba(22,31,32,.58)]">TWSE / TPEX</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="relative block min-w-0">
@@ -36,7 +39,7 @@ export function SearchBox() {
               aria-describedby={error ? "stock-search-error" : undefined}
               aria-invalid={Boolean(error)}
               aria-label="股票代號"
-              className="h-14 w-full border border-[rgba(31,42,43,.14)] bg-[rgb(248,244,232)] pl-12 pr-4 font-mono text-lg tabular-nums tracking-[0.22em] text-[rgb(18,24,25)] outline-none transition placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-[rgba(31,42,43,.42)] focus:border-[rgba(32,100,93,.55)] focus:ring-4 focus:ring-[rgba(32,100,93,.1)]"
+              className="h-14 w-full border border-[rgba(31,42,43,.16)] bg-[rgb(242,241,236)] pl-12 pr-4 font-mono text-lg tabular-nums tracking-[0.22em] text-[rgb(16,23,24)] outline-none transition placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-[rgba(31,42,43,.5)] focus:border-[rgba(32,100,93,.55)] focus:ring-4 focus:ring-[rgba(32,100,93,.1)]"
               inputMode="numeric"
               maxLength={4}
               pattern="[0-9]{4}"
@@ -49,7 +52,7 @@ export function SearchBox() {
             />
           </label>
           <button
-            className="inline-flex h-14 items-center justify-center gap-2 border border-[rgba(31,42,43,.16)] bg-[rgb(22,30,31)] px-5 text-sm font-semibold text-[rgb(248,244,232)] shadow-[0_16px_34px_rgba(22,30,31,.18)] transition hover:bg-[rgb(31,86,81)] active:translate-y-px sm:px-7"
+            className="inline-flex h-14 items-center justify-center gap-2 border border-[rgba(31,42,43,.16)] bg-[rgb(15,22,23)] px-5 text-sm font-semibold text-[rgb(245,242,233)] shadow-[0_16px_34px_rgba(22,30,31,.18)] transition hover:bg-[rgb(31,86,81)] active:translate-y-px sm:px-7"
             type="submit"
           >
             建立研究摘要

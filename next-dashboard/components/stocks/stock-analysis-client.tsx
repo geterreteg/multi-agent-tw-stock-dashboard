@@ -252,60 +252,64 @@ function ResearchHeader({
   sources: AnalyzeResponse["sources"];
 }) {
   return (
-    <section className="relative isolate overflow-hidden border-b border-white/[.08] pb-8 pt-4 sm:pb-10">
-      <div className="absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-[rgba(199,183,143,.34)] to-transparent" />
-      <div className="absolute right-[-10%] top-16 -z-10 h-72 w-72 rounded-full bg-[rgba(94,137,132,.12)] blur-3xl" />
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
-        <div>
+    <section className="research-surface relative isolate overflow-hidden border border-[rgba(199,183,143,.14)] bg-[rgba(6,9,11,.62)] shadow-[0_34px_120px_rgba(0,0,0,.34)]">
+      <div className="absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-[rgba(199,183,143,.36)] to-transparent" />
+      <div className="absolute right-[-14%] top-[-20%] -z-10 h-96 w-96 rounded-full bg-[rgba(94,137,132,.13)] blur-3xl" />
+      <div className="absolute left-[28%] top-0 -z-10 h-full w-px bg-[rgba(199,183,143,.1)]" />
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="p-5 sm:p-8 lg:p-10">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-            <span className="font-mono uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">public equity research</span>
+            <span className="font-mono uppercase tracking-[0.24em] text-[rgba(199,183,143,.72)]">equity research masthead</span>
             <span className="text-slate-500">期間：{data.period}</span>
             <span className="text-slate-500">最後更新：{data.lastUpdated}</span>
           </div>
-          <h1 className="mt-6 text-balance text-5xl font-semibold leading-none tracking-tight text-[rgb(244,241,232)] sm:text-6xl">
-            <span className="font-mono tabular-nums">{data.symbol}</span>{" "}
-            <span>{data.name}</span>
-          </h1>
-          <p className="mt-6 max-w-4xl border-l border-[rgba(199,183,143,.32)] pl-5 text-base leading-8 text-slate-300">
-            {recommendationPreview}
-          </p>
+          <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <h1 className="text-balance text-4xl font-semibold leading-none tracking-tight text-[rgb(244,241,232)] sm:text-6xl">
+              <span className="font-mono tabular-nums">{data.symbol}</span>{" "}
+              <span>{data.name}</span>
+            </h1>
+            <div className="border-l border-[rgba(199,183,143,.22)] pl-4 text-xs leading-6 text-slate-500">
+              <p>研究期間 {data.period}</p>
+              <p>資料來源 {formatSourceNames(sources)}</p>
+            </div>
+          </div>
+          <div className="mt-8 max-w-4xl border-l border-[rgba(199,183,143,.36)] pl-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(207,224,203)]">recommendation preview</p>
+            <p className="mt-3 text-base leading-8 text-slate-300">{recommendationPreview}</p>
+          </div>
         </div>
-        <div className={verdictSealClass(displayedRating)}>
-          <p className="text-xs tracking-[0.24em] opacity-70">投資評級</p>
-          <p className="mt-4 text-3xl font-semibold tracking-tight">{ratingDisplayLabel(displayedRating)}</p>
-          <dl className="mt-6 space-y-3 border-t border-current/20 pt-4 text-left text-xs leading-5 opacity-75">
-            <div className="flex justify-between gap-3">
-              <dt>信心</dt>
-              <dd className="font-medium">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
+        <aside className="border-t border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.045)] p-5 sm:p-8 lg:border-l lg:border-t-0">
+          <div className={verdictSealClass(displayedRating)}>
+            <p className="text-xs tracking-[0.24em] opacity-70">綜合判斷</p>
+            <p className="mt-4 text-3xl font-semibold tracking-tight">{ratingDisplayLabel(displayedRating)}</p>
+          </div>
+          <dl className="mt-6 grid gap-3 text-xs leading-5 text-slate-400">
+            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
+              <dt>信心分數</dt>
+              <dd className="font-mono text-[rgb(244,241,232)]">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt>缺口</dt>
-              <dd className="font-medium">{report.dataGaps.length} 項</dd>
+            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
+              <dt>資料缺口</dt>
+              <dd className="font-medium text-[rgb(244,241,232)]">{report.dataGaps.length} 項</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt>期間</dt>
-              <dd className="font-medium">{data.period}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>更新</dt>
-              <dd className="font-medium">{data.lastUpdated}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt>品質</dt>
-              <dd className="font-medium">{dataQualityLabel}</dd>
+            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
+              <dt>資料品質</dt>
+              <dd className="font-medium text-[rgb(244,241,232)]">{dataQualityLabel}</dd>
             </div>
             <div>
-              <dt>來源</dt>
-              <dd className="mt-1 font-medium">{formatSourceNames(sources)}</dd>
+              <dt className="uppercase tracking-[0.16em] text-slate-500">source status</dt>
+              <dd className="mt-2 text-slate-300">{formatSourceNames(sources)}</dd>
             </div>
           </dl>
-        </div>
+        </aside>
       </div>
-      <div className="mt-9 grid border border-white/[.08] bg-[rgba(8,12,14,.58)] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid border-t border-[rgba(199,183,143,.12)] bg-[rgba(5,8,10,.64)] sm:grid-cols-2 xl:grid-cols-6">
         <QuoteStripItem label="綜合分數" value={formatScore(finalScore)} />
+        <QuoteStripItem label="信心分數" value={formatConfidence(report.confidenceScore, report.isLegacyFallback)} />
         <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
         <QuoteStripItem label="最新收盤" value={formatPlainMetric(data.metrics.latestClose)} />
         <QuoteStripItem label="20 日報酬" value={formatSignedMetric(data.metrics.return20d, "%")} />
+        <QuoteStripItem label="資料來源" value={formatSourceNames(sources)} tone={dataQualityTone} />
       </div>
     </section>
   );
@@ -319,7 +323,7 @@ function stanceBadgeClass(stance: string) {
 
 function verdictSealClass(stance: string) {
   const base =
-    "border px-6 py-5 text-center shadow-[0_28px_90px_rgba(0,0,0,.22)] lg:justify-self-end";
+    "border px-6 py-5 text-center shadow-[0_28px_90px_rgba(0,0,0,.22)]";
   if (stance.includes("Buy")) {
     return `${base} border-[rgba(140,174,145,.42)] bg-[rgba(74,104,82,.18)] text-[rgb(207,224,203)]`;
   }
@@ -346,9 +350,9 @@ function QuoteStripItem({
         : "text-[rgb(244,241,232)]";
 
   return (
-    <div className="border-b border-white/[.08] p-4 last:border-b-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
+    <div className="min-w-0 border-b border-white/[.08] p-4 last:border-b-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
       <p className="text-xs tracking-[0.18em] text-slate-500">{label}</p>
-      <p className={`mt-2 font-mono text-xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
+      <p className={`mt-2 break-words font-mono text-lg font-semibold tabular-nums ${toneClass}`}>{value}</p>
     </div>
   );
 }
@@ -436,23 +440,24 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
   ];
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)]">
-      <Card className="border-[rgba(199,183,143,.18)] bg-[rgba(199,183,143,.045)]">
-        <CardHeader className="border-b border-white/[.06]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle>投資結論</CardTitle>
-              <p className="mt-3 text-sm leading-7 text-slate-300">{data.decision.recommendationText}</p>
+    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,.82fr)]">
+      <Card className="overflow-hidden border-[rgba(199,183,143,.18)] bg-[rgba(7,10,12,.78)] shadow-[0_26px_90px_rgba(0,0,0,.24)]">
+        <CardHeader className="border-b border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.035)]">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">investment decision</p>
+              <CardTitle className="mt-3 text-2xl">投資結論</CardTitle>
+              <p className="mt-4 text-sm leading-8 text-slate-300">{data.decision.recommendationText}</p>
               {report.isLegacyFallback ? (
-                <p className="mt-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
+                <p className="mt-4 border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
                   目前顯示舊版摘要；新版結構化研究報告需搭配升級後端。舊版 API 仍可顯示原始建議理由與既有分數，不代表系統故障。
                 </p>
               ) : null}
-              <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/[.045] p-3 text-xs leading-6 text-amber-100/85">
+              <p className="mt-4 border border-amber-300/15 bg-amber-300/[.045] p-3 text-xs leading-6 text-amber-100/85">
                 {COURSE_RESEARCH_DISCLAIMER}
               </p>
             </div>
-            <div className="min-w-[240px] rounded-2xl border border-white/[.08] bg-slate-950/35 p-4">
+            <div className="min-w-[250px] border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5">
               <p className="text-xs tracking-[0.16em] text-slate-500">RESEARCH RATING</p>
               <Badge className={`mt-3 ${stanceBadgeClass(report.recommendation)}`}>{ratingDisplayLabel(report.recommendation)}</Badge>
               <dl className="mt-4 grid gap-3 text-xs">
@@ -476,15 +481,18 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-5">
-          <div className="mb-5 rounded-2xl border border-cyan-300/10 bg-cyan-300/[.045] p-4">
+        <CardContent className="pt-6">
+          <div className="mb-6 border border-cyan-300/10 bg-cyan-300/[.045] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/70">建議理由</p>
             <p className="mt-2 text-sm leading-7 text-slate-200">{data.decision.recommendationText || "舊版 API 未提供完整建議理由，請搭配下方分數與風險項目判讀。"}</p>
           </div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">關鍵數據</p>
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">關鍵數據</p>
+            <p className="text-xs text-slate-600">僅呈現模型取得之資料，不補造缺漏數字。</p>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {report.keyMetrics.map((metric) => (
-              <div key={metric} className="rounded-2xl border border-white/[.06] bg-slate-950/30 px-4 py-3 text-sm text-slate-300">
+              <div key={metric} className="border border-white/[.06] bg-slate-950/30 px-4 py-3 text-sm leading-6 text-slate-300">
                 {metric}
               </div>
             ))}

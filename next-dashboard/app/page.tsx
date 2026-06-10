@@ -16,37 +16,47 @@ const demos = [
 export default function DashboardHome() {
   return (
     <div className="space-y-10">
-      <section className="relative isolate overflow-hidden border-b border-white/[.08] pb-12 pt-8 sm:pb-16 lg:min-h-[calc(100vh-3rem)] lg:pb-20 lg:pt-12">
-        <div className="absolute inset-x-[-6%] top-12 -z-10 h-px bg-gradient-to-r from-transparent via-[rgba(217,204,166,.34)] to-transparent" />
-        <div className="absolute left-[-16%] top-[-18%] -z-10 h-[30rem] w-[30rem] rounded-full bg-[rgba(217,204,166,.16)] blur-3xl" />
-        <div className="absolute right-[-12%] top-12 -z-10 h-[28rem] w-[28rem] rounded-full bg-[rgba(104,176,169,.16)] blur-3xl" />
-        <div className="absolute bottom-[-20%] right-[18%] -z-10 h-72 w-72 rounded-full bg-[rgba(244,241,232,.08)] blur-3xl" />
-        <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(217,204,166,.035)_1px,transparent_1px),linear-gradient(rgba(217,204,166,.028)_1px,transparent_1px)] bg-[size:84px_84px] opacity-80" />
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.12fr)_minmax(340px,.88fr)] lg:items-end">
+      <section className="terminal-hero relative isolate overflow-hidden border border-white/[.08] bg-[rgba(7,10,12,.58)] px-5 py-6 shadow-[0_34px_140px_rgba(0,0,0,.36)] sm:px-8 sm:py-10 lg:min-h-[calc(100vh-3rem)] lg:px-10 lg:py-12">
+        <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(217,204,166,.022)_1px,transparent_1px),linear-gradient(rgba(217,204,166,.018)_1px,transparent_1px)] bg-[size:96px_96px]" />
+        <div className="absolute left-[-18%] top-[-18%] -z-10 h-[36rem] w-[36rem] rounded-full bg-[rgba(199,183,143,.16)] blur-3xl" />
+        <div className="absolute right-[-12%] top-10 -z-10 h-[32rem] w-[32rem] rounded-full bg-[rgba(90,148,141,.16)] blur-3xl" />
+        <div className="absolute bottom-0 left-0 right-0 -z-10 h-40 bg-gradient-to-t from-[rgba(5,7,8,.92)] to-transparent" />
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-white/[.08] pb-5">
+          <div className="flex items-center gap-3">
+            <span className="h-2 w-2 bg-[rgb(181,221,214)] shadow-[0_0_18px_rgba(181,221,214,.55)]" />
+            <span className="font-mono text-xs uppercase tracking-[0.24em] text-[rgba(229,218,190,.72)]">
+              TW Equity Research Terminal
+            </span>
+          </div>
+          <span className="border border-[rgba(199,183,143,.22)] bg-[rgba(199,183,143,.06)] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-[rgba(229,218,190,.76)]">
+            Rule-based multi-agent model
+          </span>
+        </div>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,.92fr)] lg:items-end">
           <div className="max-w-5xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[rgba(199,183,143,.78)]">
-              Taiwan equity research workflow
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-stone-300">
+              Taiwan equity research cockpit
             </p>
-            <h1 className="mt-7 max-w-4xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-[rgb(244,241,232)] sm:text-5xl lg:text-6xl">
-              把台股分析，拆成可解釋的研究流程
+            <h1 className="mt-6 max-w-4xl text-balance text-4xl font-semibold leading-[1.04] tracking-tight text-[rgb(244,241,232)] sm:text-5xl lg:text-[4.35rem]">
+              台股多 Agent 研究終端
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-300">
-              輸入台股代號，系統會整合價格、基本面、籌碼與風險觀點，整理成一份可追溯的多 Agent 研究摘要。
+              將價格、基本面、籌碼、風險與反方觀點拆解成可追溯的研究流程，輸出帶有評級、信心分數與資料缺口的規則式分析摘要。
             </p>
             <div id="stock-search" className="mt-10 scroll-mt-24">
               <SearchBox />
             </div>
-            <p className="mt-4 max-w-2xl border-l border-[rgba(199,183,143,.34)] pl-4 text-xs leading-6 text-slate-500">
+            <p className="mt-4 max-w-2xl border-l border-[rgba(199,183,143,.34)] pl-4 text-xs leading-6 text-slate-400">
               資料可能延遲或不完整；本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。
             </p>
             <div className="mt-7">
-              <p className="text-xs font-medium tracking-[0.18em] text-slate-500">範例標的</p>
+              <p className="text-xs font-medium tracking-[0.18em] text-stone-300">範例標的</p>
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
                 {demos.map((demo) => (
                   <Link
                     key={demo.symbol}
                     href={`/stocks/${demo.symbol}`}
-                    className="group inline-flex items-baseline gap-2 border-b border-white/10 pb-1 text-slate-500 transition hover:border-[rgba(199,183,143,.55)] hover:text-[rgb(229,218,190)]"
+                    className="group inline-flex items-baseline gap-2 border-b border-white/10 pb-1 text-slate-400 transition hover:border-[rgba(199,183,143,.55)] hover:text-[rgb(229,218,190)]"
                   >
                     <span className="font-mono text-xs tabular-nums tracking-[0.18em]">{demo.symbol}</span>
                     <span>{demo.name}</span>
@@ -55,38 +65,43 @@ export default function DashboardHome() {
               </div>
             </div>
           </div>
-          <aside className="relative min-h-[430px] overflow-hidden border border-white/[.08] bg-[rgba(9,13,16,.52)] p-5 shadow-[0_30px_120px_rgba(0,0,0,.28)] backdrop-blur-md sm:p-6">
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(217,204,166,.045)_1px,transparent_1px),linear-gradient(rgba(217,204,166,.038)_1px,transparent_1px)] bg-[size:48px_48px]" />
-            <div className="absolute right-[-18%] top-[-14%] h-64 w-64 rounded-full bg-[rgba(132,190,184,.16)] blur-3xl" />
-            <div className="absolute left-6 top-20 h-52 w-[72%] rotate-[-3deg] border border-[rgba(217,204,166,.22)] bg-[rgba(248,244,232,.08)]" />
-            <div className="absolute bottom-12 right-5 h-48 w-[74%] rotate-[2deg] border border-white/[.08] bg-[rgba(248,244,232,.045)]" />
-            <div className="relative flex items-start justify-between gap-6 border-b border-white/[.08] pb-5">
+          <aside className="relative overflow-hidden border border-[rgba(199,183,143,.18)] bg-[rgba(12,17,19,.92)] p-5 shadow-[0_30px_120px_rgba(0,0,0,.32)] sm:p-6">
+            <div className="absolute right-[-20%] top-[-22%] h-72 w-72 rounded-full bg-[rgba(94,137,132,.12)] blur-3xl" />
+            <div className="relative flex items-start justify-between gap-6 border-b border-[rgba(199,183,143,.16)] pb-5">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Research note</p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[rgb(244,241,232)]">市場觀察票據</h2>
+                <p className="text-xs uppercase tracking-[0.24em] text-stone-300">Research desk</p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[rgb(244,241,232)]">多 Agent 研究桌</h2>
               </div>
-              <span className="border border-[rgba(199,183,143,.35)] bg-[rgba(199,183,143,.08)] px-3 py-1 text-xs text-[rgb(229,218,190)]">
-                demo
+              <span className="border border-[rgba(199,183,143,.35)] bg-[rgba(199,183,143,.1)] px-3 py-1 text-xs text-[rgb(238,229,203)]">
+                preview
               </span>
             </div>
-            <div className="relative mt-5 grid grid-cols-3 gap-2 text-xs">
-              <span className="border border-white/[.08] bg-white/[.035] px-3 py-2 text-slate-400">Price</span>
-              <span className="border border-[rgba(132,190,184,.2)] bg-[rgba(132,190,184,.06)] px-3 py-2 text-[rgb(184,218,213)]">Quality</span>
-              <span className="border border-[rgba(199,183,143,.22)] bg-[rgba(199,183,143,.06)] px-3 py-2 text-[rgb(229,218,190)]">Risk</span>
+            <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
+              <PreviewMetric label="Rating" value="Buy" tone="positive" />
+              <PreviewMetric label="Confidence" value="72/100" />
+              <PreviewMetric label="Data gaps" value="2" tone="warning" />
             </div>
-            <div className="relative my-7 h-24 border-y border-white/[.07]">
-              <div className="absolute left-0 top-1/2 h-px w-full bg-[rgba(217,204,166,.12)]" />
-              <div className="absolute bottom-5 left-[8%] h-8 w-px bg-[rgba(132,190,184,.45)]" />
-              <div className="absolute bottom-5 left-[24%] h-12 w-px bg-[rgba(132,190,184,.28)]" />
-              <div className="absolute bottom-5 left-[44%] h-16 w-px bg-[rgba(217,204,166,.34)]" />
-              <div className="absolute bottom-5 left-[63%] h-10 w-px bg-[rgba(132,190,184,.34)]" />
-              <div className="absolute bottom-5 left-[82%] h-14 w-px bg-[rgba(217,204,166,.24)]" />
-              <div className="absolute left-[8%] top-9 h-px w-[74%] bg-gradient-to-r from-[rgba(132,190,184,.12)] via-[rgba(132,190,184,.52)] to-[rgba(217,204,166,.22)]" />
+            <div className="relative mt-6 border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.34)] p-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-300">Agent consensus</p>
+                <span className="text-xs text-[rgb(184,218,213)]">4 modules</span>
+              </div>
+              <div className="mt-4 grid gap-2">
+                <ConsensusRow label="Price" value="偏多" strength="72%" />
+                <ConsensusRow label="Fundamental" value="中性" strength="58%" />
+                <ConsensusRow label="Chip" value="觀察" strength="51%" />
+                <ConsensusRow label="Risk" value="保守" strength="46%" />
+              </div>
             </div>
-            <div className="relative divide-y divide-white/[.07]">
-              <PreviewRow label="台積電" value="Neutral / 中性" delta="+4.2%" />
-              <PreviewRow label="鴻海" value="觀察" delta="+1.8%" />
-              <PreviewRow label="聯發科" value="Buy / 看多" delta="+6.1%" />
+            <div className="relative mt-5 border border-[rgba(232,190,128,.18)] bg-[rgba(232,190,128,.055)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-300">Risk flags</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["資料缺口", "短線波動", "估值敏感"].map((item) => (
+                  <span key={item} className="border border-[rgba(232,190,128,.24)] bg-[rgba(232,190,128,.08)] px-3 py-1.5 text-xs text-[rgb(239,210,161)]">
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           </aside>
         </div>
@@ -119,14 +134,24 @@ export default function DashboardHome() {
   );
 }
 
-function PreviewRow({ label, value, delta }: { label: string; value: string; delta: string }) {
+function PreviewMetric({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "positive" | "warning" }) {
+  const valueClass =
+    tone === "positive" ? "text-[rgb(184,218,213)]" : tone === "warning" ? "text-[rgb(239,210,161)]" : "text-[rgb(244,241,232)]";
+
   return (
-    <div className="flex items-center justify-between gap-4 py-4">
-      <div>
-        <p className="font-medium text-[rgb(18,24,25)]">{label}</p>
-        <p className="mt-1 text-xs text-[rgba(31,42,43,.48)]">多 Agent 評級：{value}</p>
-      </div>
-      <span className="font-mono text-sm font-semibold tabular-nums text-[rgb(28,101,91)]">{delta}</span>
+    <div className="border border-[rgba(199,183,143,.16)] bg-[rgba(244,241,232,.055)] p-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-stone-300">{label}</p>
+      <p className={`mt-2 font-mono text-xl font-semibold tabular-nums ${valueClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function ConsensusRow({ label, value, strength }: { label: string; value: string; strength: string }) {
+  return (
+    <div className="grid grid-cols-[110px_1fr_48px] items-center gap-3 text-sm">
+      <span className="font-mono text-xs uppercase tracking-[0.16em] text-slate-300">{label}</span>
+      <span className="text-[rgb(244,241,232)]">{value}</span>
+      <span className="text-right font-mono text-xs text-[rgb(184,218,213)]">{strength}</span>
     </div>
   );
 }

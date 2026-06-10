@@ -8,27 +8,28 @@ const agents = [
 
 export function AgentFlow() {
   return (
-    <section className="border-y border-white/[.08] py-8">
+    <section className="border-y border-[rgba(199,183,143,.12)] py-9">
       <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
         <div className="lg:sticky lg:top-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[rgba(199,183,143,.72)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-300">
             research protocol
           </p>
           <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[rgb(244,241,232)]">多 Agent 工作流程</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-400">
+          <p className="mt-3 text-sm leading-7 text-slate-300">
             每個模組只處理一種研究視角，最後再整合成可解釋摘要。
           </p>
         </div>
-        <ol className="divide-y divide-white/[.08] border-l border-[rgba(199,183,143,.28)]">
+        <ol className="relative grid gap-0 overflow-hidden border border-[rgba(199,183,143,.14)] bg-[rgba(5,8,10,.34)] lg:grid-cols-5 lg:divide-x lg:divide-[rgba(199,183,143,.1)]">
           {agents.map((agent, index) => (
-            <li key={agent.title} className="grid gap-3 py-5 pl-5 sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-6">
+            <li key={agent.title} className="relative border-b border-[rgba(199,183,143,.1)] p-5 last:border-b-0 lg:border-b-0">
               <span className="font-mono text-sm font-semibold tabular-nums tracking-[0.18em] text-[rgb(229,218,190)]">
                 0{index + 1}
               </span>
-              <div>
-                <h3 className="text-base font-semibold text-white">{agent.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{agent.body}</p>
+              <div className="mt-7">
+                <h3 className="text-base font-semibold text-[rgb(244,241,232)]">{agent.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{agent.body}</p>
               </div>
+              <div className="mt-5 h-px w-12 bg-[rgba(199,183,143,.32)]" />
             </li>
           ))}
         </ol>

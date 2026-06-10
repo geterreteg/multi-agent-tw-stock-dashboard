@@ -21,15 +21,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-Hant" className="dark">
       <body>
         <MobileTopBar />
-        <div className="relative mx-auto flex min-h-screen max-w-[1500px]">
-          <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/[.08] bg-slate-950/35 p-6 backdrop-blur-xl lg:block">
+        <div className="relative mx-auto flex min-h-screen max-w-[1540px]">
+          <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-[rgba(199,183,143,.14)] bg-[rgba(5,8,10,.68)] p-6 backdrop-blur-xl lg:block">
             <Link href="/" className="flex items-center gap-3">
-              <div className="rounded-2xl bg-cyan-300/10 p-3 text-cyan-200">
+              <div className="border border-[rgba(199,183,143,.22)] bg-[rgba(199,183,143,.07)] p-3 text-[rgb(207,224,203)]">
                 <BarChart3 className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-semibold text-white">台股智慧分析</p>
-                <p className="text-xs text-slate-500">多代理分析系統</p>
+                <p className="font-semibold text-[rgb(244,241,232)]">台股研究終端</p>
+                <p className="text-xs text-slate-500">Multi-Agent Research</p>
               </div>
             </Link>
             <nav className="mt-10 space-y-2">
@@ -37,15 +37,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-400 transition hover:bg-white/[.06] hover:text-white"
+                  className="flex items-center gap-3 border border-transparent px-4 py-3 text-sm font-medium text-slate-400 transition hover:border-[rgba(199,183,143,.16)] hover:bg-white/[.045] hover:text-[rgb(244,241,232)]"
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Link>
               ))}
             </nav>
-            <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/[.08] bg-white/[.04] p-4">
-              <p className="text-sm font-semibold text-emerald-200">系統狀態</p>
+            <div className="absolute bottom-6 left-6 right-6 border border-[rgba(199,183,143,.14)] bg-white/[.035] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(207,224,203)]">System Status</p>
               <p className="mt-2 text-sm leading-6 text-slate-400">已串接 FastAPI 分析後端，投資結論僅供課程研究與參考。</p>
             </div>
           </aside>
