@@ -266,12 +266,7 @@ def decision_agent(context, prior_agents: list[AgentInsight]) -> tuple[AgentInsi
     report = build_equity_research_report(context, prior_agents)
     final_score = round(report.scoreBreakdown["totalScore"], 2)
     confidence = report.confidenceScore / 100
-    recommendation_text = (
-        f"{context.stock_id} {context.stock_name} 的規則式研究評級為 {report.recommendation}，"
-        f"總分 {final_score:.1f}/100，confidenceScore {report.confidenceScore}/100。"
-        f"主要依據為：{'；'.join(report.investmentThesis[:2])} "
-        f"主要反方觀點為：{'；'.join(report.variantView[:2])}"
-    )
+    recommendation_text = build_recommendation_text(context, report, final_score)
     decision = DecisionSummary(
         rating=report.recommendation,
         supportReasons=report.investmentThesis,
@@ -323,8 +318,11 @@ def build_equity_research_report(context, agents: list[AgentInsight]) -> EquityR
     total = round(sum(category_scores.values()), 2)
     coverage = data_coverage(context)
     source_penalty = 10 if any(not status.ok for status in context.source_status) else 0
-    confidence = int(max(0, min(100, round(coverage * 70 + min(total, 100) * 0.20 - len(gaps) * 4 - source_penalty))))
+    valuation_penalty = 8 if pe_not_meaningful(context) else 0
+    confidence = int(max(0, min(100, round(coverage * 70 + min(total, 100) * 0.20 - len(gaps) * 4 - source_penalty - valuation_penalty))))
     recommendation = recommendation_from_score(total, confidence, gaps)
+    if pe_not_meaningful(context) and recommendation in {"Strong Buy / 強烈看多", "Buy / 看多"}:
+        recommendation = "Neutral / 中性"
 
     thesis = build_thesis(context, total, recommendation)
     business_quality = build_business_quality(context)
@@ -357,7 +355,10 @@ def build_equity_research_report(context, agents: list[AgentInsight]) -> EquityR
 
 
 def build_thesis(context, total: float, recommendation: Rating) -> list[str]:
-    items = [f"評級為 {recommendation}，總分 {total:.1f}/100，屬規則式研究結論，不含目標價。"]
+    items = [
+        f"目前建議：{recommendation_action_label(recommendation)}。評級為 {recommendation}，總分 {total:.1f}/100，屬規則式研究結論，不含目標價。"
+    ]
+    items.append(primary_reason(context, recommendation))
     if context.latest_close is not None and context.ma20 is not None and context.ma60 is not None:
         relation = "高於" if context.latest_close > context.ma20 and context.latest_close > context.ma60 else "未同時高於"
         items.append(f"價格面：收盤價 {fmt_number(context.latest_close)} {relation} MA20/MA60，形成主要趨勢判斷。")
@@ -435,6 +436,10 @@ def build_catalysts(context) -> list[str]:
 
 def build_variant_view(context, recommendation: Rating, risks: list[str]) -> list[str]:
     items = [f"若後續資料證明目前訊號不可持續，{recommendation} 評級需要下修。"]
+    items.append(f"轉強條件：{'; '.join(strengthening_conditions(context)[:3])}")
+    items.append(f"轉弱條件：{'; '.join(weakening_conditions(context)[:3])}")
+    if pe_not_meaningful(context):
+        items.append("EPS 為負或 PE 無效時，反方可主張目前不宜積極布局；除非 EPS 轉正、營收改善或籌碼明顯轉強，否則應維持保守。")
     if context.pe_ratio is not None and context.pe_ratio > 30:
         items.append("反方可主張估值已提前反映成長，營收或 EPS 不如預期會造成估值收縮。")
     if context.return_20d is not None and context.return_20d > 15:
@@ -442,6 +447,177 @@ def build_variant_view(context, recommendation: Rating, risks: list[str]) -> lis
     if risks:
         items.append(f"最直接的反方依據：{risks[0]}")
     return items
+
+
+def build_recommendation_text(context, report: EquityResearchReport, final_score: float) -> str:
+    action = recommendation_action_label(report.recommendation)
+    reason = primary_reason(context, report.recommendation)
+    strategy = operation_strategy(context, report.recommendation)
+    stronger = "；".join(strengthening_conditions(context))
+    weaker = "；".join(weakening_conditions(context))
+    risks = sentence_join(report.risks[:3]) if report.risks else "資料不足，需保守解讀。"
+    indicators = "；".join(key_observation_indicators(context))
+    gaps = f" 資料缺口：{sentence_join(report.dataGaps[:3])}" if report.dataGaps else ""
+    pe_note = " EPS 為負或 PE 無效，因此本益比不具一般估值意義，不能解讀為便宜。" if pe_not_meaningful(context) else ""
+    return (
+        f"核心結論：{context.stock_id} {context.stock_name} 目前建議為「{action}」，規則式評級為 {report.recommendation}，"
+        f"finalScore {final_score:.1f}/100，confidenceScore {report.confidenceScore}/100。{reason}{pe_note}\n"
+        f"操作策略：{strategy}\n"
+        f"轉強條件：{stronger}\n"
+        f"轉弱條件：{weaker}\n"
+        f"主要風險：{risks}\n"
+        f"關鍵觀察指標：{indicators}。{gaps}"
+        "本結論僅供課程研究與資料分析展示，不構成正式投資建議或獲利保證。"
+    )
+
+
+def recommendation_action_label(recommendation: Rating) -> str:
+    if recommendation == "Strong Buy / 強烈看多":
+        return "具較高吸引力，但仍應設定停損與風險上限"
+    if recommendation == "Buy / 看多":
+        return "偏正向，可分批觀察或等待合理價位布局"
+    if recommendation == "Neutral / 中性":
+        return "觀望、不建議追價，等待更明確訊號"
+    if recommendation == "Sell / 看空":
+        return "偏保守，建議降低曝險或暫停新增布局"
+    return "高風險，避免積極布局並等待基本面或趨勢改善"
+
+
+def primary_reason(context, recommendation: Rating) -> str:
+    trend_text = trend_summary(context)
+    growth_text = growth_summary(context)
+    chip_text = chip_summary(context)
+    if recommendation in {"Strong Buy / 強烈看多", "Buy / 看多"}:
+        return f"偏正向的主要原因是{trend_text}，且{growth_text}，同時需確認{chip_text}是否延續。"
+    if recommendation == "Neutral / 中性":
+        return f"採觀望的主要原因是多空訊號未形成一致結論：{trend_text}，{growth_text}，但{chip_text}。"
+    return f"偏保守的主要原因是{trend_text}，且{chip_text}；若基本面沒有明顯改善，風險報酬比不宜積極承擔。"
+
+
+def operation_strategy(context, recommendation: Rating) -> str:
+    if recommendation == "Strong Buy / 強烈看多":
+        return "若已持有，可續抱但應以 MA20 或近期支撐作為風險控管；若尚未持有，仍建議分批，不宜一次重倉。"
+    if recommendation == "Buy / 看多":
+        return "可偏正向追蹤，但以逢回分批觀察為主，避免在短線急漲後追價。"
+    if recommendation == "Neutral / 中性":
+        return "以觀望為主，不建議追價；等待價格重新站回關鍵均線、EPS 或營收訊號改善、籌碼轉強後再提高關注。"
+    if recommendation == "Sell / 看空":
+        return "建議降低曝險或暫停新增布局；若已有部位，應檢查是否跌破均線或基本面惡化而需要控管風險。"
+    return "建議避免積極布局；除非價格趨勢、EPS、營收與籌碼至少兩項明顯改善，否則維持保守。"
+
+
+def strengthening_conditions(context) -> list[str]:
+    conditions: list[str] = []
+    if context.latest_close is None or context.ma20 is None:
+        conditions.append("補齊收盤價與 MA20 後再確認短線趨勢")
+    elif context.latest_close <= context.ma20:
+        conditions.append(f"收盤價重新站回 MA20 {fmt_number(context.ma20)}")
+    else:
+        conditions.append("收盤價維持在 MA20 之上")
+    if context.latest_close is None or context.ma60 is None:
+        conditions.append("補齊 MA60 後再確認中期趨勢")
+    elif context.latest_close <= context.ma60:
+        conditions.append(f"收盤價重新站回 MA60 {fmt_number(context.ma60)}")
+    else:
+        conditions.append("收盤價維持在 MA60 之上")
+    if context.eps is None:
+        conditions.append("EPS 資料補齊且轉為正向")
+    elif context.eps <= 0:
+        conditions.append("EPS 轉正，讓 PE 重新具備一般估值意義")
+    else:
+        conditions.append("EPS 維持正值")
+    if context.revenue_growth is None:
+        conditions.append("月營收成長資料補齊")
+    elif context.revenue_growth <= 5:
+        conditions.append("月營收年增率回到 5% 以上")
+    else:
+        conditions.append("月營收年增率維持正成長")
+    if context.foreign_buy is None and context.institutional_net_buy is None:
+        conditions.append("法人買賣超資料補齊")
+    elif (context.foreign_buy or 0) <= 0 and (context.institutional_net_buy or 0) <= 0:
+        conditions.append("外資或三大法人買賣超轉正")
+    else:
+        conditions.append("法人買盤延續")
+    return unique_items(conditions)
+
+
+def weakening_conditions(context) -> list[str]:
+    conditions: list[str] = []
+    if context.latest_close is not None and context.ma20 is not None:
+        conditions.append(f"收盤價跌破或持續低於 MA20 {fmt_number(context.ma20)}")
+    else:
+        conditions.append("價格與 MA20 資料不足，無法確認短線風險")
+    if context.latest_close is not None and context.ma60 is not None:
+        conditions.append(f"收盤價跌破或持續低於 MA60 {fmt_number(context.ma60)}")
+    else:
+        conditions.append("MA60 資料不足，無法確認中期趨勢")
+    if context.revenue_growth is None:
+        conditions.append("月營收資料不足，營運動能需降級判讀")
+    elif context.revenue_growth < 0:
+        conditions.append("月營收年增率維持負成長")
+    else:
+        conditions.append("月營收年增率明顯放緩")
+    if context.eps is None:
+        conditions.append("EPS 資料不足")
+    elif context.eps <= 0:
+        conditions.append("EPS 持續為負")
+    else:
+        conditions.append("EPS 轉弱或低於預期")
+    if context.foreign_buy is None and context.institutional_net_buy is None:
+        conditions.append("法人籌碼資料不足")
+    elif (context.foreign_buy or 0) < 0 or (context.institutional_net_buy or 0) < 0:
+        conditions.append("外資或三大法人持續賣超")
+    else:
+        conditions.append("法人買盤轉為賣超")
+    return unique_items(conditions)
+
+
+def key_observation_indicators(context) -> list[str]:
+    return [
+        f"收盤價 {fmt_number(context.latest_close)}",
+        f"MA20 {fmt_number(context.ma20)}",
+        f"MA60 {fmt_number(context.ma60)}",
+        f"20 日報酬率 {fmt_number(context.return_20d, suffix='%')}",
+        f"EPS {fmt_number(context.eps)}",
+        f"本益比 {fmt_pe_metric(context)}",
+        f"月營收成長 {fmt_number(context.revenue_growth, suffix='%')}",
+        f"外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}",
+        f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}",
+        f"融資餘額變化 {fmt_number(context.margin_balance_change, decimals=0)}",
+    ]
+
+
+def trend_summary(context) -> str:
+    if context.latest_close is None:
+        return "缺少最新收盤價，價格趨勢資料不足"
+    if context.ma20 is None or context.ma60 is None:
+        return "均線資料不足，趨勢判讀需降級"
+    if context.latest_close > context.ma20 and context.latest_close > context.ma60:
+        return "價格同時站上 MA20 與 MA60"
+    if context.latest_close < context.ma20 and context.latest_close < context.ma60:
+        return "價格同時低於 MA20 與 MA60"
+    if context.latest_close < context.ma20:
+        return "價格低於 MA20，短線動能偏弱"
+    return "價格高於 MA20 但中期趨勢仍需確認"
+
+
+def growth_summary(context) -> str:
+    revenue = "月營收資料不足" if context.revenue_growth is None else f"月營收年增率 {fmt_number(context.revenue_growth, suffix='%')}"
+    eps = "EPS 資料不足" if context.eps is None else f"EPS {fmt_number(context.eps)}"
+    return f"{revenue}，{eps}"
+
+
+def chip_summary(context) -> str:
+    if context.foreign_buy is None and context.institutional_net_buy is None:
+        return "法人籌碼資料不足"
+    return f"外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}、三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}"
+
+
+def sentence_join(items: list[str]) -> str:
+    cleaned = [item.rstrip("。；; ") for item in items if item]
+    if not cleaned:
+        return "資料不足。"
+    return "；".join(cleaned) + "。"
 
 
 def collect_data_gaps(context) -> list[str]:

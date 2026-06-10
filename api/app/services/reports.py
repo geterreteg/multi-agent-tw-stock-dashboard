@@ -122,7 +122,7 @@ scoreBreakdown：{decision.scoreBreakdown}
 #### 觀察重點
 {watch_items}
 
-#### 觀察建議
+#### 投資建議與操作條件
 {decision.recommendationText}
 
 ## 七、資料限制與免責聲明
