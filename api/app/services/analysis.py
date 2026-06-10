@@ -12,6 +12,7 @@ from app.models import (
     ChartBundle,
     DataSourceStatus,
     DecisionSummary,
+    EquityResearchReport,
     MetricSnapshot,
     MovingAveragePoint,
     PricePoint,
@@ -165,19 +166,43 @@ def source_to_api_status(status: SourceStatus) -> DataSourceStatus:
 
 def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResponse:
     normalized = symbol.strip() or "UNKNOWN"
-    decision = DecisionSummary(
-        supportReasons=["目前無法形成有效支持理由。"],
+    research_report = EquityResearchReport(
+        investmentThesis=["資料服務失敗，無法形成投資論點。"],
+        keyMetrics=["資料不足"],
+        businessQuality=["資料不足"],
+        financialAnalysis=["資料不足"],
+        valuation=["資料不足，不產生目標價。"],
+        catalysts=["資料不足"],
         risks=[message],
-        watchPoints=["請稍後重試，或檢查資料來源與網路狀態。"],
-        recommendationText="資料服務發生錯誤，目前僅能採中立觀察；請稍後重試，或檢查資料來源與網路狀態。",
+        variantView=["資料恢復前，所有研究結論需採保守解讀。"],
+        recommendation="Neutral / 中性",
+        confidenceScore=10,
+        dataGaps=["股價資料", "基本面資料", "籌碼資料", message],
+        scoreBreakdown={
+            "financialOrPricePerformance": 0,
+            "growth": 0,
+            "valuationReasonableness": 0,
+            "catalysts": 0,
+            "riskControl": 0,
+            "totalScore": 0,
+            "dataCoverage": 0,
+        },
+    )
+    decision = DecisionSummary(
+        rating=research_report.recommendation,
+        supportReasons=research_report.investmentThesis,
+        risks=[message],
+        watchPoints=research_report.dataGaps,
+        recommendationText="資料服務發生錯誤，目前僅能採 Neutral / 中性；請稍後重試，或檢查資料來源與網路狀態。",
         finalScore=0,
-        scoreBreakdown={},
+        scoreBreakdown=research_report.scoreBreakdown,
+        researchReport=research_report,
     )
     return AnalyzeResponse(
         symbol=normalized,
         name=f"{normalized}.TW",
         period=period,
-        rating="中立",
+        rating="Neutral / 中性",
         lastUpdated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         metrics=MetricSnapshot(),
         charts=ChartBundle(price=[], volume=[], movingAverage=[]),
@@ -185,11 +210,11 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
             AgentInsight(
                 name="資料蒐集 Agent",
                 role="資料錯誤攔截",
-                stance="中立",
+                stance="Neutral / 中性",
                 score=0,
                 confidence=0.12,
                 summary=message,
-                narrative=f"資料蒐集階段發生錯誤：{message}。目前無法形成完整分析，系統採中立觀察並保留降級提示。",
+                narrative=f"資料蒐集階段發生錯誤：{message}。目前無法形成完整分析，系統採 Neutral / 中性並保留降級提示。",
                 evidence=["資料服務錯誤"],
                 degraded=True,
                 reasons=["資料不足"],

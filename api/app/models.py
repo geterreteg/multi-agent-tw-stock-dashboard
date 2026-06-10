@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-Rating = Literal["偏多", "中立", "偏空"]
+Rating = Literal["Strong Buy / 強烈看多", "Buy / 看多", "Neutral / 中性", "Sell / 看空", "Strong Sell / 強烈看空"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -71,13 +71,30 @@ class DebateMessage(BaseModel):
     tone: Literal["support", "risk", "summary", "neutral"]
 
 
+class EquityResearchReport(BaseModel):
+    investmentThesis: list[str]
+    keyMetrics: list[str]
+    businessQuality: list[str]
+    financialAnalysis: list[str]
+    valuation: list[str]
+    catalysts: list[str]
+    risks: list[str]
+    variantView: list[str]
+    recommendation: Rating
+    confidenceScore: int = Field(..., ge=0, le=100)
+    dataGaps: list[str]
+    scoreBreakdown: dict[str, float]
+
+
 class DecisionSummary(BaseModel):
+    rating: Rating
     supportReasons: list[str]
     risks: list[str]
     watchPoints: list[str]
     recommendationText: str
     finalScore: float
     scoreBreakdown: dict[str, float]
+    researchReport: EquityResearchReport
 
 
 class DataSourceStatus(BaseModel):

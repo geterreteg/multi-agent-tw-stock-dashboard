@@ -4,6 +4,7 @@ from app.models import (
     ChartBundle,
     DataSourceStatus,
     DecisionSummary,
+    EquityResearchReport,
     MetricSnapshot,
     MovingAveragePoint,
     PricePoint,
@@ -59,7 +60,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="資料蒐集 Agent",
             role="整合價格、籌碼與基本面資料狀態",
-            stance="中立",
+            stance="Neutral / 中性",
             score=0,
             confidence=0.92,
             summary="mock 資料已完成整合，後續可替換為 yfinance 與 FinMind 真實資料。",
@@ -72,7 +73,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="技術分析 Agent",
             role="觀察趨勢、均線與短線動能",
-            stance="中立",
+            stance="Buy / 看多",
             score=0.5,
             confidence=0.78,
             summary="價格維持在主要均線附近，趨勢偏穩但尚未形成強烈方向。",
@@ -85,7 +86,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="基本面 Agent",
             role="評估營收、EPS 與本益比",
-            stance="中立",
+            stance="Buy / 看多",
             score=0.5,
             confidence=0.74,
             summary="營收成長與 EPS 具支撐，但評價面仍需與同業比較。",
@@ -98,7 +99,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="風險控管 Agent",
             role="提出反方觀點與資料限制",
-            stance="中立",
+            stance="Neutral / 中性",
             score=-0.5,
             confidence=0.70,
             summary="目前資料為示範 mock data，正式分析前仍需接回真實資料源。",
@@ -111,39 +112,66 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         AgentInsight(
             name="決策整合 Agent",
             role="整合多方觀點產生評級",
-            stance="中立",
+            stance="Neutral / 中性",
             score=0.25,
             confidence=0.82,
-            summary="整體訊號偏穩，第一版示範評級為中立。",
-            narrative="示範決策整合技術、基本面與風險提醒後採中立觀察，不構成買賣建議。",
-            evidence=["示範評級：中立", "資料狀態：mock"],
+            summary="示範資料只能驗證格式，第一版示範評級為 Neutral / 中性。",
+            narrative="示範決策整合技術、基本面與風險提醒後採 Neutral / 中性，不構成買賣建議。",
+            evidence=["示範評級：Neutral / 中性", "資料狀態：mock"],
             degraded=True,
             reasons=["正向訊號與風險提醒並存", "適合持續觀察"],
             risks=["示範資料不能作為投資依據"],
         ),
     ]
 
-    decision = DecisionSummary(
-        supportReasons=["短期趨勢維持穩定", "營收與 EPS mock 指標呈現支撐", "法人買賣超示範值為正"],
-        risks=["目前仍為 mock data", "正式版需驗證 FinMind 權限與資料完整度", "不應視為買賣建議"],
-        watchPoints=["接回真實 yfinance 歷史價格", "接回 FinMind 月營收與法人資料", "建立 API 錯誤與降級狀態"],
-        recommendationText="示範資料僅供格式驗收，正式研究需以 yfinance 與 FinMind 真實資料重新分析，目前採中立觀察。",
-        finalScore=0.25,
+    research_report = EquityResearchReport(
+        investmentThesis=[
+            "示範資料總分 58.0/100，僅用於驗證 Public Equity Investing 研究報告欄位。",
+            f"價格面示範收盤價 {metrics.latestClose}，20 日報酬率 {metrics.return20d}%。",
+            f"基本面示範 EPS {metrics.eps}，本益比 {metrics.peRatio}，營收成長 {metrics.revenueGrowth}%。",
+        ],
+        keyMetrics=[
+            f"最新收盤價：{metrics.latestClose}",
+            f"20 日報酬率：{metrics.return20d}%",
+            f"MA20 / MA60：{metrics.ma20} / {metrics.ma60}",
+            f"EPS：{metrics.eps}",
+            f"本益比：{metrics.peRatio}",
+            f"營收成長：{metrics.revenueGrowth}%",
+            f"外資買賣超：{metrics.foreignBuy}",
+        ],
+        businessQuality=["mock 資料不可代表真實商業品質。", "正式分析需接回 FinMind 產業分類、月營收與財報。"],
+        financialAnalysis=["示範價格、EPS 與營收成長欄位可被前端卡片化呈現。"],
+        valuation=["示範本益比僅供格式驗收，不產生目標價。"],
+        catalysts=["示範營收成長與價格動能為正，但不代表真實催化因素。"],
+        risks=["目前仍為 mock data。", "正式版需驗證 yfinance 與 FinMind 資料完整度。"],
+        variantView=["若接回真實資料後營收、EPS 或法人資料不支持，評級應下修。"],
+        recommendation="Neutral / 中性",
+        confidenceScore=35,
+        dataGaps=["真實 yfinance 股價資料", "真實 FinMind 基本面資料", "真實 FinMind 籌碼資料"],
         scoreBreakdown={
-            "technical": 0.5,
-            "fundamental": 0.5,
-            "chip": 0,
-            "risk": -0.5,
-            "technicalWeighted": 0.2,
-            "fundamentalWeighted": 0.15,
-            "chipWeighted": 0,
-            "riskWeighted": -0.05,
+            "financialOrPricePerformance": 16,
+            "growth": 12,
+            "valuationReasonableness": 10,
+            "catalysts": 8,
+            "riskControl": 12,
+            "totalScore": 58,
+            "dataCoverage": 30,
         },
+    )
+    decision = DecisionSummary(
+        rating=research_report.recommendation,
+        supportReasons=research_report.investmentThesis,
+        risks=["目前仍為 mock data", "正式版需驗證 FinMind 權限與資料完整度", "不應視為買賣建議"],
+        watchPoints=research_report.dataGaps,
+        recommendationText="示範資料僅供格式驗收，正式研究需以 yfinance 與 FinMind 真實資料重新分析，目前採 Neutral / 中性。",
+        finalScore=58,
+        scoreBreakdown=research_report.scoreBreakdown,
+        researchReport=research_report,
     )
 
     report = f"""# {normalized} {name} 多 Agent 投資分析摘要
 
-## 綜合評級：中立
+## 綜合評級：Neutral / 中性
 
 本報告為新版 Next.js + FastAPI 骨架示範資料，尚未接入真實 yfinance 與 FinMind 分析邏輯。
 
@@ -156,7 +184,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         symbol=normalized,
         name=name,
         period=period,
-        rating="中立",
+        rating="Neutral / 中性",
         lastUpdated="2026-06-04 18:00",
         metrics=metrics,
         charts=ChartBundle(price=price, volume=volume, movingAverage=moving_average),
