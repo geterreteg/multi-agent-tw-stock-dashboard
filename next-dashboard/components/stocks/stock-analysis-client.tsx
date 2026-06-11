@@ -32,6 +32,22 @@ type ResearchReportView = {
   scoreBreakdown: Record<string, number>;
 };
 
+type ResearchTabId = "summary" | "technical" | "fundamental" | "risk" | "conclusion";
+
+type ResearchTabGroup = {
+  title: string;
+  items: string[];
+  tone?: "default" | "risk" | "gap";
+};
+
+type ResearchTab = {
+  id: ResearchTabId;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  groups: ResearchTabGroup[];
+};
+
 export function StockAnalysisClient({ symbol }: { symbol: string }) {
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -429,24 +445,105 @@ function AgentMetric({ label, value, tone }: { label: string; value: string; ton
   );
 }
 
-function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; report: ResearchReportView }) {
-  const sections = [
-    { title: "投資論點", items: report.investmentThesis, icon: Lightbulb },
-    { title: "估值與財務分析", items: [...report.valuation, ...report.financialAnalysis], icon: Scale },
-    { title: "商業品質", items: report.businessQuality, icon: FileText },
-    { title: "催化因素", items: report.catalysts, icon: CheckCircle2 },
-    { title: "風險與反方觀點", items: [...report.risks, ...report.variantView], icon: AlertTriangle, tone: "risk" as const },
-    { title: "資料缺口", items: report.dataGaps.length > 0 ? report.dataGaps : ["未偵測到核心資料缺口，但資料仍可能延遲或不完整。"], icon: Database, tone: "gap" as const },
+function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): ResearchTab[] {
+  const metrics = data.metrics;
+  const peWarning =
+    metrics.peRatio === null
+      ? "PE：資料暫無，無法用本益比判斷估值。"
+      : displayPeRatio(metrics) === null
+        ? `PE：EPS ${formatPlainMetric(metrics.eps)}，本益比不適合解讀，避免用無效 PE 下估值結論。`
+        : `PE：${formatPlainMetric(metrics.peRatio)}`;
+  const shortMomentum =
+    metrics.return20d === null
+      ? "短線動能：20 日報酬資料暫無。"
+      : metrics.return20d > 0
+        ? `短線動能：20 日報酬 ${formatSignedMetric(metrics.return20d, "%")}，價格動能偏正向。`
+        : metrics.return20d < 0
+          ? `短線動能：20 日報酬 ${formatSignedMetric(metrics.return20d, "%")}，價格動能偏弱。`
+          : "短線動能：20 日報酬接近持平。";
+  const maContext = [
+    `最新收盤：${formatPlainMetric(metrics.latestClose)}`,
+    `MA20：${formatPlainMetric(metrics.ma20)}`,
+    `MA60：${formatPlainMetric(metrics.ma60)}`,
+    `20 日報酬：${formatSignedMetric(metrics.return20d, "%")}`,
   ];
 
+  return [
+    {
+      id: "summary",
+      label: "摘要",
+      description: "先看投資結論、信心分數、核心理由、資料缺口與主要風險。",
+      icon: Lightbulb,
+      groups: [
+        { title: "Rating / Confidence", items: [`Rating：${ratingDisplayLabel(report.recommendation)}`, `Confidence：${formatConfidence(report.confidenceScore, report.isLegacyFallback)}`] },
+        { title: "核心理由", items: report.investmentThesis },
+        { title: "資料缺口", items: report.dataGaps.length > 0 ? report.dataGaps : ["未偵測到核心資料缺口，但資料仍可能延遲或不完整。"], tone: "gap" },
+        { title: "主要風險", items: report.risks, tone: "risk" },
+      ],
+    },
+    {
+      id: "technical",
+      label: "技術面",
+      description: "聚焦 yfinance 股價、均線、20 日報酬與短線動能，不重抓資料。",
+      icon: GaugeCircle,
+      groups: [
+        { title: "價格與均線", items: maContext },
+        { title: "短線動能", items: [shortMomentum] },
+        { title: "技術結論", items: report.keyMetrics },
+      ],
+    },
+    {
+      id: "fundamental",
+      label: "基本面 / 估值",
+      description: "整理 EPS、PE、營收成長與估值文字；PE 不適合解讀時明確警示。",
+      icon: Scale,
+      groups: [
+        { title: "獲利與營收", items: [`EPS：${formatPlainMetric(metrics.eps)}`, `營收成長：${formatSignedMetric(metrics.revenueGrowth, "%")}`] },
+        { title: "估值說明", items: [peWarning, ...report.valuation] },
+        { title: "基本面分析", items: [...report.businessQuality, ...report.financialAnalysis] },
+      ],
+    },
+    {
+      id: "risk",
+      label: "籌碼與風險",
+      description: "呈現既有外資欄位、可用籌碼線索、風險與反方觀點；缺漏不補數字。",
+      icon: AlertTriangle,
+      groups: [
+        { title: "外資買賣超", items: [`外資買賣超：${formatSignedMetric(metrics.foreignBuy)}`] },
+        { title: "三大法人 / 融資變化", items: ["三大法人合計：目前前端回傳欄位未提供，列為資料缺口。", "融資變化：目前前端回傳欄位未提供，列為資料缺口。"], tone: "gap" },
+        { title: "主要風險", items: report.risks, tone: "risk" },
+        { title: "反方觀點", items: report.variantView, tone: "risk" },
+      ],
+    },
+    {
+      id: "conclusion",
+      label: "總結",
+      description: "把操作觀察、轉強與轉弱條件、免責聲明集中在最後判讀。",
+      icon: CheckCircle2,
+      groups: [
+        { title: "操作觀察", items: data.decision.watchPoints.length > 0 ? data.decision.watchPoints : report.catalysts },
+        { title: "轉強條件", items: data.decision.supportReasons.length > 0 ? data.decision.supportReasons : report.investmentThesis },
+        { title: "轉弱條件", items: data.decision.risks.length > 0 ? data.decision.risks : report.risks, tone: "risk" },
+        { title: "免責聲明", items: [COURSE_RESEARCH_DISCLAIMER, data.disclaimer] },
+      ],
+    },
+  ];
+}
+
+function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; report: ResearchReportView }) {
+  const [activeTab, setActiveTab] = useState<ResearchTabId>("summary");
+  const reportTabs = buildResearchTabs(data, report);
+  const activePanel = reportTabs.find((tab) => tab.id === activeTab) ?? reportTabs[0];
+  const ActiveIcon = activePanel.icon;
+
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(340px,.82fr)]">
-      <Card className="overflow-hidden border-[rgba(199,183,143,.18)] bg-[rgba(7,10,12,.78)] shadow-[0_26px_90px_rgba(0,0,0,.24)]">
+    <section className="overflow-hidden rounded-3xl border border-[rgba(199,183,143,.18)] bg-[rgba(7,10,12,.78)] shadow-[0_26px_90px_rgba(0,0,0,.24)]">
+      <Card className="rounded-none border-0 bg-transparent shadow-none">
         <CardHeader className="border-b border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.035)]">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">investment decision</p>
-              <CardTitle className="mt-3 text-2xl">投資結論</CardTitle>
+              <CardTitle className="mt-3 text-2xl">研究報告</CardTitle>
               <p className="mt-4 text-sm leading-8 text-slate-300">{data.decision.recommendationText}</p>
               {report.isLegacyFallback ? (
                 <p className="mt-4 border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
@@ -457,7 +554,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
                 {COURSE_RESEARCH_DISCLAIMER}
               </p>
             </div>
-            <div className="min-w-[250px] border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5">
+            <div className="w-full border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5 xl:w-[280px]">
               <p className="text-xs tracking-[0.16em] text-slate-500">RESEARCH RATING</p>
               <Badge className={`mt-3 ${stanceBadgeClass(report.recommendation)}`}>{ratingDisplayLabel(report.recommendation)}</Badge>
               <dl className="mt-4 grid gap-3 text-xs">
@@ -481,30 +578,52 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="mb-6 border border-cyan-300/10 bg-cyan-300/[.045] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/70">建議理由</p>
-            <p className="mt-2 text-sm leading-7 text-slate-200">{data.decision.recommendationText || "舊版 API 未提供完整建議理由，請搭配下方分數與風險項目判讀。"}</p>
-          </div>
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">關鍵數據</p>
-            <p className="text-xs text-slate-600">僅呈現模型取得之資料，不補造缺漏數字。</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {report.keyMetrics.map((metric) => (
-              <div key={metric} className="border border-white/[.06] bg-slate-950/30 px-4 py-3 text-sm leading-6 text-slate-300">
-                {metric}
+        <CardContent className="p-0">
+          <div className="border-b border-white/[.07] bg-slate-950/25 px-3 py-3 sm:px-5">
+            <div className="overflow-x-auto pb-1">
+              <div className="flex min-w-max gap-2 rounded-full border border-white/[.08] bg-black/20 p-1">
+                {reportTabs.map((tab) => {
+                  const isActive = tab.id === activePanel.id;
+                  const Icon = tab.icon;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
+                        isActive
+                          ? "bg-[rgb(229,218,190)] text-slate-950 shadow-[0_10px_30px_rgba(0,0,0,.22)]"
+                          : "text-slate-400 hover:bg-white/[.07] hover:text-slate-100"
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="grid gap-5 p-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:p-6">
+            <aside className="border border-white/[.07] bg-slate-950/25 p-5">
+              <div className="flex items-center gap-2 text-[rgb(229,218,190)]">
+                <ActiveIcon className="h-5 w-5" />
+                <p className="text-sm font-semibold">{activePanel.label}</p>
+              </div>
+              <p className="mt-3 text-xs leading-6 text-slate-500">{activePanel.description}</p>
+            </aside>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {activePanel.groups.map((group) => (
+                <ResearchSectionCard key={group.title} title={group.title} items={group.items} tone={group.tone} />
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-        {sections.map((section) => (
-          <ResearchSectionCard key={section.title} title={section.title} items={section.items} icon={section.icon} tone={section.tone} />
-        ))}
-      </div>
     </section>
   );
 }
@@ -512,12 +631,10 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
 function ResearchSectionCard({
   title,
   items,
-  icon: Icon,
   tone = "default",
 }: {
   title: string;
   items: string[];
-  icon: LucideIcon;
   tone?: "default" | "risk" | "gap";
 }) {
   const toneClass =
@@ -530,10 +647,7 @@ function ResearchSectionCard({
   return (
     <Card className={toneClass}>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Icon className="h-5 w-5 text-cyan-100" />
-          <CardTitle>{title}</CardTitle>
-        </div>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <ul className="space-y-2 text-sm leading-6 text-slate-300">
