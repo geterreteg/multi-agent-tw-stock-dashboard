@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Database, Download, FileText, GaugeCircle, Lightbulb, Loader2, MessageSquareText, Scale, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { KpiCard } from "@/components/analysis/kpi-card";
 import { StockCharts } from "@/components/charts/stock-charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,7 @@ type ResearchTab = {
   description: string;
   icon: LucideIcon;
   groups: ResearchTabGroup[];
+  showCharts?: boolean;
 };
 
 export function StockAnalysisClient({ symbol }: { symbol: string }) {
@@ -118,7 +118,6 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
 
   const finalScore = typeof data.decision?.finalScore === "number" ? data.decision.finalScore : null;
   const researchReport = normalizeResearchReport(data);
-  const scoreBreakdown = researchReport.scoreBreakdown;
   const displayedRating = data.decision?.rating ?? researchReport.recommendation ?? data.rating;
   const recommendationPreview = previewText(data.decision?.recommendationText);
   const sourceIssues = (data.sources ?? []).filter(isSourceDegraded);
@@ -144,87 +143,6 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
       <DataQualitySummary sources={data.sources ?? []} hasDegradedAgent={hasDegradedAgent} />
 
       <StructuredResearchReport data={data} report={researchReport} />
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="最新收盤價" value={data.metrics.latestClose} />
-        <KpiCard label="20 日報酬" value={data.metrics.return20d} suffix="%" signed />
-        <KpiCard label="MA20" value={data.metrics.ma20} />
-        <KpiCard label="MA60" value={data.metrics.ma60} />
-        <KpiCard label="本益比" value={displayPeRatio(data.metrics)} />
-        <KpiCard label="EPS" value={data.metrics.eps} />
-        <KpiCard label="營收成長" value={data.metrics.revenueGrowth} suffix="%" signed />
-        <KpiCard label="外資買賣超" value={data.metrics.foreignBuy} signed />
-      </section>
-
-      <ScoreBreakdown
-        scoreBreakdown={scoreBreakdown}
-        finalScore={finalScore}
-        confidenceScore={researchReport.confidenceScore}
-        isLegacyFallback={researchReport.isLegacyFallback}
-      />
-
-      <StockCharts data={data} />
-
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Agent 分析明細</h2>
-          <span className="text-sm text-slate-500">保留各 Agent 的數據、理由與風險</span>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {data.agents.map((agent) => (
-            <AgentInsightCard key={agent.name} agent={agent} />
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-white/[.08] bg-white/[.035] p-6 shadow-glass">
-        <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
-          <div className="flex items-center gap-2 text-white">
-            <MessageSquareText className="h-5 w-5 text-cyan-200" />
-            <h2 className="text-xl font-semibold">Agent 辯論室</h2>
-          </div>
-          <p className="text-sm text-slate-500">支持觀點、反方風險與決策整合分層呈現</p>
-        </div>
-        <div className="grid gap-3">
-          {data.debate.map((item) => (
-            <div key={`${item.speaker}-${item.message}`} className={debateBubbleClass(item.tone)}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-white">{item.speaker}</span>
-                  <span className={debateToneLabelClass(item.tone)}>{debateToneLabel(item.tone)}</span>
-                </div>
-                <Badge className={stanceBadgeClass(item.stance)}>{ratingDisplayLabel(item.stance)}</Badge>
-              </div>
-              <p className="mt-2 text-sm leading-7 text-slate-300">{item.message}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <DecisionColumn title="支持理由" items={data.decision.supportReasons} />
-        <DecisionColumn title="主要風險" items={data.decision.risks} tone="risk" />
-        <DecisionColumn title="觀察重點" items={data.decision.watchPoints} />
-      </section>
-
-      <ResearchSummaryCard data={data} />
-
-      <section className="rounded-3xl border border-white/[.08] bg-white/[.04] p-6">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <div className="flex items-center gap-2 text-cyan-100">
-              <ShieldCheck className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">免責聲明</h2>
-            </div>
-            <p className="mt-3 text-sm leading-7 text-slate-400">{COURSE_RESEARCH_DISCLAIMER}</p>
-            <p className="mt-2 text-xs leading-6 text-slate-500">{data.disclaimer}</p>
-          </div>
-          <Button variant="secondary">
-            <Download className="h-4 w-4" />
-            報告下載規劃中
-          </Button>
-        </div>
-      </section>
     </div>
   );
 }
@@ -486,6 +404,7 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
       label: "技術面",
       description: "聚焦 yfinance 股價、均線、20 日報酬與短線動能，不重抓資料。",
       icon: GaugeCircle,
+      showCharts: true,
       groups: [
         { title: "價格與均線", items: maContext },
         { title: "短線動能", items: [shortMomentum] },
@@ -580,7 +499,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
         </CardHeader>
         <CardContent className="p-0">
           <div className="border-b border-white/[.07] bg-slate-950/25 px-3 py-3 sm:px-5">
-            <div className="overflow-x-auto pb-1">
+            <div className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="flex min-w-max gap-2 rounded-full border border-white/[.08] bg-black/20 p-1">
                 {reportTabs.map((tab) => {
                   const isActive = tab.id === activePanel.id;
@@ -617,6 +536,11 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             </aside>
 
             <div className="grid gap-4 md:grid-cols-2">
+              {activePanel.showCharts ? (
+                <div className="md:col-span-2">
+                  <StockCharts data={data} />
+                </div>
+              ) : null}
               {activePanel.groups.map((group) => (
                 <ResearchSectionCard key={group.title} title={group.title} items={group.items} tone={group.tone} />
               ))}
