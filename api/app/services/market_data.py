@@ -4,6 +4,7 @@ import math
 import os
 import tempfile
 import logging
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -35,6 +36,12 @@ OFFICIAL_PRICE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/125.0 Safari/537.36",
     "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "keep-alive",
+}
+TPEX_PRICE_HEADERS = {
+    **OFFICIAL_PRICE_HEADERS,
+    "Referer": "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock",
 }
 
 logger = logging.getLogger(__name__)
@@ -280,6 +287,7 @@ def fetch_tpex_price_history(stock_id: str, period: str) -> tuple[pd.DataFrame, 
     frames: list[pd.DataFrame] = []
     session = requests.Session()
     session.trust_env = False
+    retry_used = False
 
     for month_start in month_starts_for_period(period):
         params = {
@@ -287,12 +295,11 @@ def fetch_tpex_price_history(stock_id: str, period: str) -> tuple[pd.DataFrame, 
             "date": month_start.strftime("%Y/%m/%d"),
             "response": "json",
         }
-        try:
-            response = session.get(TPEX_STOCK_DAY_URL, params=params, headers=OFFICIAL_PRICE_HEADERS, timeout=OFFICIAL_PRICE_TIMEOUT_SECONDS)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:
-            return pd.DataFrame(), f"TPEx 讀取失敗：{type(exc).__name__}"
+        payload, error, did_retry = fetch_tpex_month_payload(session, params)
+        retry_used = retry_used or did_retry
+        if error:
+            retry_text = "；已重試 1 次仍失敗" if did_retry else ""
+            return pd.DataFrame(), f"TPEx 讀取失敗：{error}{retry_text}"
 
         tables = payload.get("tables") or []
         table = tables[0] if tables else {}
@@ -302,7 +309,29 @@ def fetch_tpex_price_history(stock_id: str, period: str) -> tuple[pd.DataFrame, 
 
     if not frames:
         return pd.DataFrame(), "TPEx 無可用日 K 資料"
-    return combine_price_frames(frames), ""
+    history = combine_price_frames(frames)
+    if retry_used:
+        history.attrs["source_note"] = "TPEx 重試後成功"
+    return history, ""
+
+
+def fetch_tpex_month_payload(session: requests.Session, params: dict[str, str]) -> tuple[dict[str, object], str, bool]:
+    last_error = ""
+    for attempt in range(2):
+        try:
+            response = session.get(TPEX_STOCK_DAY_URL, params=params, headers=TPEX_PRICE_HEADERS, timeout=OFFICIAL_PRICE_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            return response.json(), "", attempt > 0
+        except (requests.exceptions.SSLError, requests.exceptions.Timeout, ValueError) as exc:
+            last_error = type(exc).__name__
+            logger.info("tpex_price_request retryable_error stock_id=%s date=%s attempt=%s error=%s", params.get("code"), params.get("date"), attempt + 1, last_error)
+            if attempt == 0:
+                time.sleep(0.5)
+                continue
+        except Exception as exc:
+            return {}, type(exc).__name__, attempt > 0
+
+    return {}, last_error or "UnknownError", True
 
 
 def combine_price_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
@@ -336,8 +365,10 @@ def fetch_official_price_bundle(stock_id: str, period: str = "6mo") -> tuple[pd.
         history, error = fetcher(stock_id, period)
         if valid_price_history(history):
             trimmed = trim_price_history_for_period(history, period)
-            status = SourceStatus(source_name, True, f"已使用 {source_name} 取得 {stock_id} {period} 日 K 股價資料。")
-            logger.info("price_source selected=%s stock_id=%s rows=%s period=%s", source_name, stock_id, len(trimmed), period)
+            source_note = str(history.attrs.get("source_note") or "")
+            retry_note = "（重試後成功）" if source_note else ""
+            status = SourceStatus(source_name, True, f"已使用 {source_name}{retry_note} 取得 {stock_id} {period} 日 K 股價資料。")
+            logger.info("price_source selected=%s stock_id=%s rows=%s period=%s note=%s", source_name, stock_id, len(trimmed), period, source_note or "direct")
             return trimmed, calculate_price_metrics(trimmed), status
         reason = error or f"{source_name} 資料不足：{len(history)} 筆"
         attempts.append(reason)
