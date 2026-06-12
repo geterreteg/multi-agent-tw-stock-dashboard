@@ -30,6 +30,9 @@ class MetricSnapshot(BaseModel):
 
 class PricePoint(BaseModel):
     date: str
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
     close: Optional[float] = None
 
 

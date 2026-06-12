@@ -136,12 +136,24 @@ def build_chart_bundle(history: pd.DataFrame) -> ChartBundle:
     work = history.copy().reset_index()
     date_col = work.columns[0]
     dates = work[date_col].map(to_date_string)
+    open_price = pd.to_numeric(work.get("Open", pd.Series(dtype=float)), errors="coerce")
+    high = pd.to_numeric(work.get("High", pd.Series(dtype=float)), errors="coerce")
+    low = pd.to_numeric(work.get("Low", pd.Series(dtype=float)), errors="coerce")
     close = pd.to_numeric(work["Close"], errors="coerce")
     volume = pd.to_numeric(work.get("Volume", pd.Series(dtype=float)), errors="coerce")
     ma20 = close.rolling(20).mean()
     ma60 = close.rolling(60).mean()
 
-    price = [PricePoint(date=date, close=safe_float(value)) for date, value in zip(dates, close)]
+    price = [
+        PricePoint(
+            date=date,
+            open=safe_float(open_value),
+            high=safe_float(high_value),
+            low=safe_float(low_value),
+            close=safe_float(close_value),
+        )
+        for date, open_value, high_value, low_value, close_value in zip(dates, open_price, high, low, close)
+    ]
     volume_points = [VolumePoint(date=date, volume=safe_int(value)) for date, value in zip(dates, volume)]
     moving_average = [
         MovingAveragePoint(date=date, ma20=safe_float(ma20_value), ma60=safe_float(ma60_value))
