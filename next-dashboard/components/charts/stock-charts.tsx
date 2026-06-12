@@ -55,10 +55,10 @@ export function StockCharts({ data }: { data: AnalyzeResponse }) {
       <div className="grid gap-5">
         <ChartPanel title="成交量" description="輔助判斷價格移動背後是否有量能支持。" muted>
           <ResponsiveContainer width="100%" height={185}>
-            <BarChart data={data.charts.volume}>
+            <BarChart data={data.charts.volume} margin={{ left: 8, right: 4 }}>
               <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
               <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
-              <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} />
+              <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={formatVolumeAxis} width={58} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="volume" fill="#34d399" opacity={0.52} radius={[6, 6, 0, 0]} />
             </BarChart>
@@ -325,6 +325,22 @@ function formatAxisPrice(value: number) {
 
 function formatCompactPrice(value: number) {
   return value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+}
+
+function formatVolumeAxis(value: number | string) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "資料暫無";
+  const absolute = Math.abs(numeric);
+
+  if (absolute >= 1_000_000) {
+    return `${(numeric / 1_000_000).toLocaleString("zh-TW", { maximumFractionDigits: 1 })}M`;
+  }
+
+  if (absolute >= 1_000) {
+    return `${(numeric / 1_000).toLocaleString("zh-TW", { maximumFractionDigits: 0 })}K`;
+  }
+
+  return numeric.toLocaleString("zh-TW", { maximumFractionDigits: 0 });
 }
 
 const tooltipStyle = {

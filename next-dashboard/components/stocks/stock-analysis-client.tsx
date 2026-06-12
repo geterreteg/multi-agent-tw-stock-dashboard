@@ -39,12 +39,18 @@ type ResearchTabGroup = {
   tone?: "default" | "risk" | "gap";
 };
 
+type ResearchTabHighlight = {
+  label: string;
+  value: string;
+};
+
 type ResearchTab = {
   id: ResearchTabId;
   label: string;
   description: string;
   icon: LucideIcon;
   groups: ResearchTabGroup[];
+  highlights?: ResearchTabHighlight[];
   showCharts?: boolean;
 };
 
@@ -363,6 +369,34 @@ function AgentMetric({ label, value, tone }: { label: string; value: string; ton
   );
 }
 
+function buildTechnicalHighlights(metrics: AnalyzeResponse["metrics"]): ResearchTabHighlight[] {
+  return [
+    { label: "最新收盤", value: formatPlainMetric(metrics.latestClose) },
+    { label: "20 日報酬", value: formatSignedMetric(metrics.return20d, "%") },
+    { label: "MA20", value: formatPlainMetric(metrics.ma20) },
+    { label: "MA60", value: formatPlainMetric(metrics.ma60) },
+    { label: "短線動能", value: formatMomentumLabel(metrics.return20d) },
+    { label: "目前位階", value: formatMovingAveragePosition(metrics.latestClose, metrics.ma20, metrics.ma60) },
+  ];
+}
+
+function formatMomentumLabel(return20d: number | null) {
+  if (return20d === null) return "資料暫無";
+  if (return20d > 0) return "偏正向";
+  if (return20d < 0) return "偏弱";
+  return "接近持平";
+}
+
+function formatMovingAveragePosition(latestClose: number | null, ma20: number | null, ma60: number | null) {
+  if (latestClose === null) return "資料暫無";
+  const positions = [
+    ma20 === null ? null : `${latestClose >= ma20 ? "高於" : "低於"} MA20`,
+    ma60 === null ? null : `${latestClose >= ma60 ? "高於" : "低於"} MA60`,
+  ].filter(Boolean);
+
+  return positions.length > 0 ? positions.join(" / ") : "資料暫無";
+}
+
 function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): ResearchTab[] {
   const metrics = data.metrics;
   const peWarning =
@@ -402,9 +436,10 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
     {
       id: "technical",
       label: "技術面",
-      description: "聚焦 yfinance 股價、均線、20 日報酬與短線動能，不重抓資料。",
+      description: "聚焦官方日 K 股價、均線、20 日報酬與短線動能；若官方資料不可用，才使用 yfinance fallback。",
       icon: GaugeCircle,
       showCharts: true,
+      highlights: buildTechnicalHighlights(metrics),
       groups: [
         { title: "價格與均線", items: maContext },
         { title: "短線動能", items: [shortMomentum] },
@@ -533,6 +568,16 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
                 <p className="text-sm font-semibold">{activePanel.label}</p>
               </div>
               <p className="mt-3 text-xs leading-6 text-slate-500">{activePanel.description}</p>
+              {activePanel.highlights && activePanel.highlights.length > 0 ? (
+                <dl className="mt-5 grid gap-2 border-t border-white/[.07] pt-4">
+                  {activePanel.highlights.map((item) => (
+                    <div key={item.label} className="flex items-start justify-between gap-3 text-xs">
+                      <dt className="shrink-0 text-slate-500">{item.label}</dt>
+                      <dd className="min-w-0 text-right font-medium leading-5 text-slate-200">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
             </aside>
 
             <div className="grid gap-4 md:grid-cols-2">
