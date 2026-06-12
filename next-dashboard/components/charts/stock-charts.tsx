@@ -125,7 +125,7 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
   ];
 
   return (
-    <div className="flex w-fit rounded-full border border-white/[.08] bg-black/20 p-1">
+    <div className="flex w-fit rounded-full border border-white/[.1] bg-slate-950/60 p-1 shadow-inner shadow-black/30">
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -133,8 +133,10 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
-              isActive ? "bg-cyan-100 text-slate-950 shadow-[0_10px_28px_rgba(0,0,0,.22)]" : "text-slate-400 hover:bg-white/[.07] hover:text-slate-100"
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
+              isActive
+                ? "border-cyan-200/70 bg-cyan-100 text-slate-950 shadow-[0_0_0_1px_rgba(103,232,249,.2),0_10px_28px_rgba(0,0,0,.26)]"
+                : "border-transparent text-slate-400 hover:border-white/[.08] hover:bg-white/[.075] hover:text-slate-100 active:bg-white/[.1]"
             }`}
             aria-pressed={isActive}
           >
@@ -158,7 +160,9 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
     );
   }
 
-  const candleWidth = Math.max(2.4, Math.min(9, (chart.width - chart.padding.left - chart.padding.right) / chart.points.length * 0.58));
+  const stepWidth = (chart.width - chart.padding.left - chart.padding.right) / chart.points.length;
+  const candleWidth = Math.max(3.2, Math.min(10.5, stepWidth * 0.78));
+  const hitWidth = Math.max(candleWidth + 3, stepWidth);
 
   return (
     <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-white/[.06] bg-slate-950/25">
@@ -168,7 +172,7 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
           <g key={tick.value}>
             <line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={tick.y} y2={tick.y} stroke="rgba(148,163,184,.12)" />
             <text x={chart.padding.left - 10} y={tick.y + 4} textAnchor="end" className="fill-slate-500 text-[11px]">
-              {formatCompactPrice(tick.value)}
+              {formatAxisPrice(tick.value)}
             </text>
           </g>
         ))}
@@ -179,7 +183,10 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
         ))}
         {chart.points.map((point) => {
           const rising = point.close >= point.open;
-          const color = rising ? "#34d399" : "#fb7185";
+          const isHovered = hovered?.point.date === point.date;
+          const color = rising ? "#22c55e" : "#f43f5e";
+          const wickColor = rising ? "rgba(34,197,94,.82)" : "rgba(244,63,94,.82)";
+          const fillColor = rising ? "rgba(34,197,94,.34)" : "rgba(244,63,94,.34)";
           const bodyTop = Math.min(point.openY, point.closeY);
           const bodyHeight = Math.max(1.5, Math.abs(point.closeY - point.openY));
           return (
@@ -189,16 +196,32 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
               onMouseMove={(event: MouseEvent<SVGGElement>) => setHovered({ x: event.clientX, y: event.clientY, point })}
               onMouseLeave={() => setHovered(null)}
             >
-              <line x1={point.x} x2={point.x} y1={point.highY} y2={point.lowY} stroke={color} strokeWidth={1.4} />
+              {isHovered ? (
+                <rect
+                  x={point.x - hitWidth / 2}
+                  y={chart.padding.top}
+                  width={hitWidth}
+                  height={chart.height - chart.padding.top - chart.padding.bottom}
+                  fill="rgba(148,163,184,.08)"
+                />
+              ) : null}
+              <line x1={point.x} x2={point.x} y1={point.highY} y2={point.lowY} stroke={wickColor} strokeWidth={isHovered ? 1.9 : 1.45} />
               <rect
                 x={point.x - candleWidth / 2}
                 y={bodyTop}
                 width={candleWidth}
                 height={bodyHeight}
                 rx={1}
-                fill={rising ? "rgba(52,211,153,.22)" : "rgba(251,113,133,.22)"}
+                fill={isHovered ? color : fillColor}
                 stroke={color}
-                strokeWidth={1.3}
+                strokeWidth={isHovered ? 1.8 : 1.35}
+              />
+              <rect
+                x={point.x - hitWidth / 2}
+                y={chart.padding.top}
+                width={hitWidth}
+                height={chart.height - chart.padding.top - chart.padding.bottom}
+                fill="transparent"
               />
             </g>
           );
@@ -210,10 +233,10 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
           style={{ left: Math.min(hovered.x + 14, window.innerWidth - 190), top: Math.max(hovered.y - 84, 12) }}
         >
           <p className="font-medium text-white">{hovered.point.date}</p>
-          <p>開：{formatCompactPrice(hovered.point.open)}</p>
-          <p>高：{formatCompactPrice(hovered.point.high)}</p>
-          <p>低：{formatCompactPrice(hovered.point.low)}</p>
-          <p>收：{formatCompactPrice(hovered.point.close)}</p>
+          <p>開盤：{formatCompactPrice(hovered.point.open)}</p>
+          <p>最高：{formatCompactPrice(hovered.point.high)}</p>
+          <p>最低：{formatCompactPrice(hovered.point.low)}</p>
+          <p>收盤：{formatCompactPrice(hovered.point.close)}</p>
         </div>
       ) : null}
     </div>
@@ -246,6 +269,11 @@ function buildCandlestickViewModel(data: AnalyzeResponse["charts"]["price"]) {
       low: point.low as number,
       close: point.close as number,
     }));
+
+  if (raw.length === 0) {
+    return { width, height, padding, points: [], yTicks: [], xLabels: [] };
+  }
+
   const minPrice = Math.min(...raw.map((point) => point.low));
   const maxPrice = Math.max(...raw.map((point) => point.high));
   const range = maxPrice - minPrice || Math.max(maxPrice, 1) * 0.05;
@@ -263,16 +291,36 @@ function buildCandlestickViewModel(data: AnalyzeResponse["charts"]["price"]) {
     lowY: yFor(point.low),
     closeY: yFor(point.close),
   }));
-  const yTicks = Array.from({ length: 5 }, (_, index) => {
-    const value = lower + ((upper - lower) / 4) * index;
-    return { value, y: yFor(value) };
-  }).reverse();
+  const yTicks = buildPriceTicks(lower, upper).map((value) => ({ value, y: yFor(value) })).reverse();
   const labelStep = Math.max(1, Math.ceil(raw.length / 6));
   const xLabels = raw
     .map((point, index) => ({ date: point.date, x: xFor(index), index }))
     .filter((label) => label.index % labelStep === 0 || label.index === raw.length - 1);
 
   return { width, height, padding, points, yTicks, xLabels };
+}
+
+function buildPriceTicks(lower: number, upper: number) {
+  const targetTicks = 5;
+  const rawStep = Math.max((upper - lower) / (targetTicks - 1), 1);
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const normalized = rawStep / magnitude;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = Math.max(1, niceNormalized * magnitude);
+  const first = Math.floor(lower / step) * step;
+  const ticks: number[] = [];
+
+  for (let value = first; value <= upper + step * 0.5 && ticks.length < 7; value += step) {
+    if (value >= lower - step * 0.5) {
+      ticks.push(Math.round(value));
+    }
+  }
+
+  return ticks.length >= 2 ? ticks : [Math.floor(lower), Math.ceil(upper)];
+}
+
+function formatAxisPrice(value: number) {
+  return value.toLocaleString("zh-TW", { maximumFractionDigits: 0 });
 }
 
 function formatCompactPrice(value: number) {
