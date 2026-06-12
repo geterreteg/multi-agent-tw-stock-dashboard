@@ -21,7 +21,7 @@ from app.models import (
 from app.services.market_data import (
     SourceStatus,
     fetch_finmind_bundle,
-    fetch_yfinance_bundle,
+    fetch_official_price_bundle,
     get_finmind_token,
     normalize_symbol,
     safe_float,
@@ -65,7 +65,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
     stock_id = normalize_symbol(symbol)
     last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     token, token_mode = get_finmind_token()
-    history, metrics, y_status = fetch_yfinance_bundle(stock_id, period)
+    history, metrics, price_status = fetch_official_price_bundle(stock_id, period)
     finmind = fetch_finmind_bundle(stock_id, token, token_mode)
 
     return StockContext(
@@ -88,7 +88,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
         margin_balance_change=safe_float(finmind["margin_balance_change"]),
         short_balance_change=safe_float(finmind["short_balance_change"]),
         dividend_summary=str(finmind["dividend_summary"]),
-        source_status=[y_status, finmind["status"]],
+        source_status=[price_status, finmind["status"]],
         finmind_errors=list(finmind["errors"]),
         finmind_token_mode=token_mode,
     )

@@ -3,9 +3,10 @@ from __future__ import annotations
 import math
 import os
 import tempfile
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -19,11 +20,19 @@ except ImportError:  # pragma: no cover
 
 
 YFINANCE_SOURCE = "Yahoo Finance / yfinance"
+TWSE_SOURCE = "TWSE 官方日 K"
+TPEX_SOURCE = "TPEx 官方日 K"
 FINMIND_SOURCE = "FinMind"
 FINMIND_API_URL = "https://api.finmindtrade.com/api/v4/data"
+TWSE_STOCK_DAY_URL = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
+TPEX_STOCK_DAY_URL = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
 FINMIND_TOKEN_CONFIGURED_MESSAGE = "FinMind API 權限已由後端環境設定"
 FINMIND_TOKEN_PUBLIC_MESSAGE = "未偵測到 FinMind API 權限，將嘗試公開限制模式"
 PROXY_ENV_VARS = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "GIT_HTTP_PROXY", "GIT_HTTPS_PROXY"]
+OFFICIAL_PRICE_TIMEOUT_SECONDS = 10
+MIN_PRICE_ROWS = 20
+
+logger = logging.getLogger(__name__)
 
 if yf is not None:
     cache_dir = Path(tempfile.gettempdir()) / "tw_stock_yfinance_cache"
@@ -113,6 +122,229 @@ def calculate_price_metrics(history: pd.DataFrame) -> dict[str, Optional[float]]
         "return_20d": return_20d,
         "average_volume": average_volume,
     }
+
+
+def parse_period_months(period: str) -> int:
+    normalized = (period or "6mo").strip().lower()
+    if normalized.endswith("mo"):
+        try:
+            return max(1, min(60, int(normalized[:-2])))
+        except ValueError:
+            return 6
+    if normalized.endswith("y"):
+        try:
+            return max(1, min(60, int(normalized[:-1]) * 12))
+        except ValueError:
+            return 12
+    if normalized == "ytd":
+        today = date.today()
+        return max(1, today.month)
+    return 6
+
+
+def month_starts_for_period(period: str) -> list[date]:
+    today = date.today()
+    month_count = parse_period_months(period)
+    cursor = date(today.year, today.month, 1)
+    months: list[date] = []
+    for _ in range(month_count + 1):
+        months.append(cursor)
+        if cursor.month == 1:
+            cursor = date(cursor.year - 1, 12, 1)
+        else:
+            cursor = date(cursor.year, cursor.month - 1, 1)
+    return sorted(months)
+
+
+def period_start_date(period: str) -> pd.Timestamp:
+    today = date.today()
+    months = parse_period_months(period)
+    return pd.Timestamp(today - timedelta(days=months * 31))
+
+
+def parse_official_number(value: object) -> Optional[float]:
+    if value is None:
+        return None
+    text = str(value).strip().replace(",", "")
+    if text in {"", "--", "---", "None", "nan"}:
+        return None
+    try:
+        number = float(text)
+        return number if math.isfinite(number) else None
+    except ValueError:
+        return None
+
+
+def parse_official_date(value: object) -> Optional[pd.Timestamp]:
+    if value is None:
+        return None
+    text = str(value).strip().replace(".", "/").replace("-", "/")
+    parts = text.split("/")
+    if len(parts) != 3:
+        return None
+    try:
+        year, month, day = [int(part.strip()) for part in parts]
+    except ValueError:
+        return None
+    if year < 1911:
+        year += 1911
+    try:
+        return pd.Timestamp(datetime(year, month, day))
+    except ValueError:
+        return None
+
+
+def clean_official_price_rows(rows: list[list[object]], fields: list[str], volume_multiplier: int = 1) -> pd.DataFrame:
+    if not rows or not fields:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame(rows, columns=fields)
+    column_map = {
+        "date": ["日期", "日 期", "Date"],
+        "open": ["開盤價", "開盤", "Open"],
+        "high": ["最高價", "最高", "High"],
+        "low": ["最低價", "最低", "Low"],
+        "close": ["收盤價", "收盤", "Close"],
+        "volume": ["成交股數", "成交張數", "Volume"],
+    }
+
+    def find_column(candidates: list[str]) -> Optional[str]:
+        for candidate in candidates:
+            if candidate in frame.columns:
+                return candidate
+        return None
+
+    selected = {key: find_column(candidates) for key, candidates in column_map.items()}
+    if any(column is None for column in selected.values()):
+        return pd.DataFrame()
+
+    records = []
+    for _, row in frame.iterrows():
+        row_date = parse_official_date(row[selected["date"]])
+        values = {
+            "Open": parse_official_number(row[selected["open"]]),
+            "High": parse_official_number(row[selected["high"]]),
+            "Low": parse_official_number(row[selected["low"]]),
+            "Close": parse_official_number(row[selected["close"]]),
+            "Volume": parse_official_number(row[selected["volume"]]),
+        }
+        if row_date is None or any(values[column] is None for column in ["Open", "High", "Low", "Close"]):
+            continue
+        if values["Volume"] is not None:
+            values["Volume"] = values["Volume"] * volume_multiplier
+        records.append({"Date": row_date, **values})
+
+    if not records:
+        return pd.DataFrame()
+
+    cleaned = pd.DataFrame(records).drop_duplicates(subset=["Date"]).sort_values("Date")
+    cleaned = cleaned.set_index("Date")
+    return cleaned[["Open", "High", "Low", "Close", "Volume"]]
+
+
+def fetch_twse_price_history(stock_id: str, period: str) -> tuple[pd.DataFrame, str]:
+    frames: list[pd.DataFrame] = []
+    session = requests.Session()
+    session.trust_env = False
+
+    for month_start in month_starts_for_period(period):
+        params = {
+            "response": "json",
+            "date": month_start.strftime("%Y%m%d"),
+            "stockNo": stock_id,
+        }
+        try:
+            response = session.get(TWSE_STOCK_DAY_URL, params=params, timeout=OFFICIAL_PRICE_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            return pd.DataFrame(), f"TWSE 讀取失敗：{type(exc).__name__}"
+
+        if str(payload.get("stat", "")).upper() != "OK":
+            continue
+        frame = clean_official_price_rows(payload.get("data") or [], payload.get("fields") or [])
+        if not frame.empty:
+            frames.append(frame)
+
+    if not frames:
+        return pd.DataFrame(), "TWSE 無可用日 K 資料"
+    return combine_price_frames(frames), ""
+
+
+def fetch_tpex_price_history(stock_id: str, period: str) -> tuple[pd.DataFrame, str]:
+    frames: list[pd.DataFrame] = []
+    session = requests.Session()
+    session.trust_env = False
+
+    for month_start in month_starts_for_period(period):
+        params = {
+            "code": stock_id,
+            "date": month_start.strftime("%Y/%m/%d"),
+            "response": "json",
+        }
+        try:
+            response = session.get(TPEX_STOCK_DAY_URL, params=params, timeout=OFFICIAL_PRICE_TIMEOUT_SECONDS)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            return pd.DataFrame(), f"TPEx 讀取失敗：{type(exc).__name__}"
+
+        tables = payload.get("tables") or []
+        table = tables[0] if tables else {}
+        frame = clean_official_price_rows(table.get("data") or [], table.get("fields") or [], volume_multiplier=1000)
+        if not frame.empty:
+            frames.append(frame)
+
+    if not frames:
+        return pd.DataFrame(), "TPEx 無可用日 K 資料"
+    return combine_price_frames(frames), ""
+
+
+def combine_price_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    if not frames:
+        return pd.DataFrame()
+    combined = pd.concat(frames)
+    combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+    return combined[["Open", "High", "Low", "Close", "Volume"]].dropna(how="all")
+
+
+def trim_price_history_for_period(history: pd.DataFrame, period: str) -> pd.DataFrame:
+    if history.empty:
+        return history
+    start = period_start_date(period)
+    return history[history.index >= start].sort_index()
+
+
+def valid_price_history(history: pd.DataFrame, min_rows: int = MIN_PRICE_ROWS) -> bool:
+    if history.empty or len(history) < min_rows:
+        return False
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    if any(column not in history.columns for column in required):
+        return False
+    return not pd.to_numeric(history["Close"], errors="coerce").dropna().empty
+
+
+def fetch_official_price_bundle(stock_id: str, period: str = "6mo") -> tuple[pd.DataFrame, dict[str, Optional[float]], SourceStatus]:
+    attempts: list[str] = []
+    for source_name, fetcher in ((TWSE_SOURCE, fetch_twse_price_history), (TPEX_SOURCE, fetch_tpex_price_history)):
+        history, error = fetcher(stock_id, period)
+        if valid_price_history(history):
+            trimmed = trim_price_history_for_period(history, period)
+            status = SourceStatus(source_name, True, f"已使用 {source_name} 取得 {stock_id} {period} 日 K 股價資料。")
+            logger.info("price_source selected=%s stock_id=%s rows=%s period=%s", source_name, stock_id, len(trimmed), period)
+            return trimmed, calculate_price_metrics(trimmed), status
+        reason = error or f"{source_name} 資料不足：{len(history)} 筆"
+        attempts.append(reason)
+        logger.info("price_source unavailable=%s stock_id=%s reason=%s", source_name, stock_id, reason)
+
+    y_history, y_metrics, y_status = fetch_yfinance_bundle(stock_id, period)
+    if y_status.ok:
+        y_status = SourceStatus(YFINANCE_SOURCE, True, f"官方日 K 不可用，已 fallback yfinance。{'；'.join(attempts)}")
+        logger.info("price_source selected=%s stock_id=%s rows=%s period=%s fallback_reason=%s", YFINANCE_SOURCE, stock_id, len(y_history), period, "；".join(attempts))
+    else:
+        y_status = SourceStatus(YFINANCE_SOURCE, False, f"官方日 K 與 yfinance 皆不可用。{'；'.join(attempts)}；{y_status.message}")
+        logger.info("price_source failed stock_id=%s period=%s reason=%s", stock_id, period, y_status.message)
+    return y_history, y_metrics, y_status
 
 
 def fetch_yfinance_bundle(stock_id: str, period: str = "6mo") -> tuple[pd.DataFrame, dict[str, Optional[float]], SourceStatus]:
