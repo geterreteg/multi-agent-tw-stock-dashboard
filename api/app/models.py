@@ -106,6 +106,41 @@ class DataSourceStatus(BaseModel):
     message: str
 
 
+class ChipDataGap(BaseModel):
+    code: str
+    message: str
+
+
+class InstitutionalData(BaseModel):
+    symbol: str = ""
+    asOfDate: Optional[str] = None
+    foreignNetBuy: Optional[int] = None
+    investmentTrustNetBuy: Optional[int] = None
+    dealerNetBuy: Optional[int] = None
+    institutionalNetBuyTotal: Optional[int] = None
+    source: str = "官方三大法人資料"
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
+
+
+class MarginData(BaseModel):
+    symbol: str = ""
+    asOfDate: Optional[str] = None
+    marginBalance: Optional[int] = None
+    marginChange: Optional[int] = None
+    shortBalance: Optional[int] = None
+    shortChange: Optional[int] = None
+    marginUtilizationRate: Optional[float] = None
+    shortUtilizationRate: Optional[float] = None
+    source: str = "官方融資融券資料"
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
+
+
+class ChipData(BaseModel):
+    institutional: InstitutionalData = Field(default_factory=InstitutionalData)
+    margin: MarginData = Field(default_factory=MarginData)
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
+
+
 class AnalyzeResponse(BaseModel):
     symbol: str
     name: str
@@ -118,5 +153,6 @@ class AnalyzeResponse(BaseModel):
     debate: list[DebateMessage] = Field(default_factory=list)
     decision: DecisionSummary
     sources: list[DataSourceStatus]
+    chipData: ChipData = Field(default_factory=ChipData)
     reportMarkdown: str
     disclaimer: str

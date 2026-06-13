@@ -10,16 +10,23 @@ from app.models import (
     AgentInsight,
     AnalyzeResponse,
     ChartBundle,
+    ChipData,
     DataSourceStatus,
     DecisionSummary,
     EquityResearchReport,
+    InstitutionalData,
+    MarginData,
     MetricSnapshot,
     MovingAveragePoint,
     PricePoint,
     VolumePoint,
 )
+from app.services.institutional_data import get_institutional_data
+from app.services.margin_data import get_margin_data
 from app.services.market_data import (
     SourceStatus,
+    TPEX_SOURCE,
+    TWSE_SOURCE,
     fetch_finmind_bundle,
     fetch_official_price_bundle,
     get_finmind_token,
@@ -59,6 +66,7 @@ class StockContext:
     source_status: list[SourceStatus] = field(default_factory=list)
     finmind_errors: list[str] = field(default_factory=list)
     finmind_token_mode: str = ""
+    chip_data: dict = field(default_factory=dict)
 
 
 def build_context(symbol: str, period: str = "6mo") -> StockContext:
@@ -67,6 +75,8 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
     token, token_mode = get_finmind_token()
     history, metrics, price_status = fetch_official_price_bundle(stock_id, period)
     finmind = fetch_finmind_bundle(stock_id, token, token_mode)
+    market = infer_market_from_price_status(price_status)
+    chip_data = build_chip_data(stock_id, market)
 
     return StockContext(
         stock_id=stock_id,
@@ -91,6 +101,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
         source_status=[price_status, finmind["status"]],
         finmind_errors=list(finmind["errors"]),
         finmind_token_mode=token_mode,
+        chip_data=chip_data,
     )
 
 
@@ -124,6 +135,7 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
         debate=debate,
         decision=decision,
         sources=[source_to_api_status(status) for status in context.source_status],
+        chipData=chip_data_to_model(context.chip_data),
         reportMarkdown=report,
         disclaimer=DISCLAIMER,
     )
@@ -176,8 +188,63 @@ def source_to_api_status(status: SourceStatus) -> DataSourceStatus:
     )
 
 
+def infer_market_from_price_status(status: SourceStatus) -> Optional[str]:
+    if status.name == TWSE_SOURCE:
+        return "TWSE"
+    if status.name == TPEX_SOURCE:
+        return "TPEX"
+    return None
+
+
+def build_chip_data(stock_id: str, market: Optional[str]) -> dict:
+    try:
+        institutional = get_institutional_data(stock_id, market=market)
+    except Exception as exc:
+        institutional = {
+            "symbol": stock_id,
+            "asOfDate": None,
+            "foreignNetBuy": None,
+            "investmentTrustNetBuy": None,
+            "dealerNetBuy": None,
+            "institutionalNetBuyTotal": None,
+            "source": "官方三大法人資料",
+            "dataGaps": [{"code": "source_unavailable", "message": f"官方三大法人資料讀取失敗：{type(exc).__name__}"}],
+        }
+
+    try:
+        margin = get_margin_data(stock_id, market=market)
+    except Exception as exc:
+        margin = {
+            "symbol": stock_id,
+            "asOfDate": None,
+            "marginBalance": None,
+            "marginChange": None,
+            "shortBalance": None,
+            "shortChange": None,
+            "marginUtilizationRate": None,
+            "shortUtilizationRate": None,
+            "source": "官方融資融券資料",
+            "dataGaps": [{"code": "source_unavailable", "message": f"官方融資融券資料讀取失敗：{type(exc).__name__}"}],
+        }
+
+    return {
+        "institutional": institutional,
+        "margin": margin,
+        "dataGaps": [*(institutional.get("dataGaps") or []), *(margin.get("dataGaps") or [])],
+    }
+
+
+def chip_data_to_model(chip_data: dict) -> ChipData:
+    return ChipData(
+        institutional=InstitutionalData(**(chip_data.get("institutional") or {})),
+        margin=MarginData(**(chip_data.get("margin") or {})),
+        dataGaps=chip_data.get("dataGaps") or [],
+    )
+
+
 def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResponse:
     normalized = symbol.strip() or "UNKNOWN"
+    chip_data = build_chip_data(normalized, None)
     research_report = EquityResearchReport(
         investmentThesis=["資料服務失敗，無法形成投資論點。"],
         keyMetrics=["資料不足"],
@@ -236,6 +303,7 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
         debate=[],
         decision=decision,
         sources=[DataSourceStatus(name="FastAPI", status="failed", message=message)],
+        chipData=chip_data_to_model(chip_data),
         reportMarkdown=f"# {normalized} 分析暫停\n\n{message}\n\n{DISCLAIMER}",
         disclaimer=DISCLAIMER,
     )
