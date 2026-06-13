@@ -481,7 +481,7 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
       groups: [
         {
           title: "三大法人買賣超",
-          items: [`資料來源：${formatOfficialText(institutional?.source)}`, `資料日期：${formatOfficialText(institutional?.asOfDate)}`],
+          items: [`資料來源：${formatOfficialText(institutional?.source)}`, `資料日期：${formatOfficialDate(institutional?.asOfDate)}`],
           tone: institutional?.dataGaps?.length ? "gap" : "default",
           badges: [{ label: institutional?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: institutional?.dataGaps?.length ? "gap" : "ok" }],
           metrics: [
@@ -493,7 +493,7 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
         },
         {
           title: "融資融券",
-          items: [`資料來源：${formatOfficialText(margin?.source)}`, `資料日期：${formatOfficialText(margin?.asOfDate)}`],
+          items: [`資料來源：${formatOfficialText(margin?.source)}`, `資料日期：${formatOfficialDate(margin?.asOfDate)}`],
           tone: margin?.dataGaps?.length ? "gap" : "default",
           badges: [{ label: margin?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: margin?.dataGaps?.length ? "gap" : "ok" }],
           metrics: [
@@ -723,11 +723,11 @@ function ResearchSectionCard({
       </CardHeader>
       <CardContent>
         {metrics && metrics.length > 0 ? (
-          <dl className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <dl className="mb-4 grid gap-3">
             {metrics.map((metric) => (
               <div key={`${title}-${metric.label}`} className="min-w-0 rounded-2xl border border-white/[.06] bg-slate-950/30 p-3">
                 <dt className="text-xs leading-5 text-slate-500">{metric.label}</dt>
-                <dd className={`mt-1 break-words font-mono text-sm font-semibold ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
+                <dd className={`mt-1 whitespace-nowrap font-mono text-[13px] font-semibold sm:text-sm ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
               </div>
             ))}
           </dl>
@@ -1114,6 +1114,10 @@ function formatChipDataGaps(chipData: AnalyzeResponse["chipData"]) {
 
 function formatOfficialText(value: string | null | undefined) {
   return value && value.trim().length > 0 ? value : "官方資料暫缺";
+}
+
+function formatOfficialDate(value: string | null | undefined) {
+  return value && value.trim().length > 0 ? value : "日期未提供";
 }
 
 function formatOfficialInteger(value: number | null | undefined, unit = "") {
