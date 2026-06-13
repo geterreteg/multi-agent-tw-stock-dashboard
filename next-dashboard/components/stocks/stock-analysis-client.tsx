@@ -37,11 +37,24 @@ type ResearchTabGroup = {
   title: string;
   items: string[];
   tone?: "default" | "risk" | "gap";
+  badges?: ResearchTabBadge[];
+  metrics?: ResearchTabMetric[];
 };
 
 type ResearchTabHighlight = {
   label: string;
   value: string;
+};
+
+type ResearchTabBadge = {
+  label: string;
+  tone?: "default" | "ok" | "gap";
+};
+
+type ResearchTabMetric = {
+  label: string;
+  value: string;
+  tone?: "default" | "positive" | "negative" | "muted";
 };
 
 type ResearchTab = {
@@ -399,6 +412,9 @@ function formatMovingAveragePosition(latestClose: number | null, ma20: number | 
 
 function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): ResearchTab[] {
   const metrics = data.metrics;
+  const institutional = data.chipData?.institutional ?? null;
+  const margin = data.chipData?.margin ?? null;
+  const chipDataGaps = formatChipDataGaps(data.chipData);
   const peWarning =
     metrics.peRatio === null
       ? "PE：資料暫無，無法用本益比判斷估值。"
@@ -460,11 +476,36 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
     {
       id: "risk",
       label: "籌碼與風險",
-      description: "呈現既有外資欄位、可用籌碼線索、風險與反方觀點；缺漏不補數字。",
+      description: "呈現官方三大法人、融資融券、風險與反方觀點；官方資料不可用時列為資料缺口。",
       icon: AlertTriangle,
       groups: [
-        { title: "外資買賣超", items: [`外資買賣超：${formatSignedMetric(metrics.foreignBuy)}`] },
-        { title: "三大法人 / 融資變化", items: ["三大法人合計：目前前端回傳欄位未提供，列為資料缺口。", "融資變化：目前前端回傳欄位未提供，列為資料缺口。"], tone: "gap" },
+        {
+          title: "三大法人買賣超",
+          items: [`資料來源：${formatOfficialText(institutional?.source)}`, `資料日期：${formatOfficialText(institutional?.asOfDate)}`],
+          tone: institutional?.dataGaps?.length ? "gap" : "default",
+          badges: [{ label: institutional?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: institutional?.dataGaps?.length ? "gap" : "ok" }],
+          metrics: [
+            { label: "外資買賣超", value: formatOfficialInteger(institutional?.foreignNetBuy, "股"), tone: officialNumberTone(institutional?.foreignNetBuy) },
+            { label: "投信買賣超", value: formatOfficialInteger(institutional?.investmentTrustNetBuy, "股"), tone: officialNumberTone(institutional?.investmentTrustNetBuy) },
+            { label: "自營商買賣超", value: formatOfficialInteger(institutional?.dealerNetBuy, "股"), tone: officialNumberTone(institutional?.dealerNetBuy) },
+            { label: "三大法人合計", value: formatOfficialInteger(institutional?.institutionalNetBuyTotal, "股"), tone: officialNumberTone(institutional?.institutionalNetBuyTotal) },
+          ],
+        },
+        {
+          title: "融資融券",
+          items: [`資料來源：${formatOfficialText(margin?.source)}`, `資料日期：${formatOfficialText(margin?.asOfDate)}`],
+          tone: margin?.dataGaps?.length ? "gap" : "default",
+          badges: [{ label: margin?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: margin?.dataGaps?.length ? "gap" : "ok" }],
+          metrics: [
+            { label: "融資餘額", value: formatOfficialInteger(margin?.marginBalance, "張") },
+            { label: "融資增減", value: formatOfficialInteger(margin?.marginChange, "張"), tone: officialNumberTone(margin?.marginChange) },
+            { label: "融券餘額", value: formatOfficialInteger(margin?.shortBalance, "張") },
+            { label: "融券增減", value: formatOfficialInteger(margin?.shortChange, "張"), tone: officialNumberTone(margin?.shortChange) },
+            { label: "融資使用率", value: formatOfficialPercent(margin?.marginUtilizationRate) },
+            { label: "融券使用率", value: formatOfficialPercent(margin?.shortUtilizationRate) },
+          ],
+        },
+        { title: "官方資料缺口", items: chipDataGaps, tone: chipDataGaps.length > 0 ? "gap" : "default" },
         { title: "主要風險", items: report.risks, tone: "risk" },
         { title: "反方觀點", items: report.variantView, tone: "risk" },
       ],
@@ -609,7 +650,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
                 </div>
               ) : null}
               {activePanel.groups.map((group) => (
-                <ResearchSectionCard key={group.title} title={group.title} items={group.items} tone={group.tone} />
+                <ResearchSectionCard key={group.title} {...group} />
               ))}
             </div>
           </div>
@@ -654,11 +695,9 @@ function ResearchSectionCard({
   title,
   items,
   tone = "default",
-}: {
-  title: string;
-  items: string[];
-  tone?: "default" | "risk" | "gap";
-}) {
+  badges,
+  metrics,
+}: ResearchTabGroup) {
   const toneClass =
     tone === "risk"
       ? "border-amber-300/15 bg-amber-300/[.045]"
@@ -669,12 +708,33 @@ function ResearchSectionCard({
   return (
     <Card className={toneClass}>
       <CardHeader className="pb-3">
-        <CardTitle>{title}</CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <CardTitle>{title}</CardTitle>
+          {badges && badges.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {badges.map((badge) => (
+                <Badge key={`${title}-${badge.label}`} className={researchBadgeClass(badge.tone)}>
+                  {badge.label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent>
+        {metrics && metrics.length > 0 ? (
+          <dl className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {metrics.map((metric) => (
+              <div key={`${title}-${metric.label}`} className="min-w-0 rounded-2xl border border-white/[.06] bg-slate-950/30 p-3">
+                <dt className="text-xs leading-5 text-slate-500">{metric.label}</dt>
+                <dd className={`mt-1 break-words font-mono text-sm font-semibold ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
         <ul className="space-y-2 text-sm leading-6 text-slate-300">
-          {(items.length > 0 ? items : ["資料暫無"]).map((item) => (
-            <li key={item} className="rounded-2xl border border-white/[.06] bg-slate-950/25 p-3">
+          {(items.length > 0 ? items : ["資料暫無"]).map((item, index) => (
+            <li key={`${title}-${index}-${item}`} className="rounded-2xl border border-white/[.06] bg-slate-950/25 p-3">
               {item}
             </li>
           ))}
@@ -1030,6 +1090,58 @@ function formatResearchScore(value: number | null) {
 function formatCategoryScore(value: number | null, max: number, isLegacyFallback = false) {
   if (value === null) return isLegacyFallback ? "舊版未提供" : "資料暫無";
   return `${value.toFixed(1)}/${max}`;
+}
+
+function formatChipDataGaps(chipData: AnalyzeResponse["chipData"]) {
+  if (!chipData) return ["官方籌碼與融資融券資料尚未隨分析回應提供。"];
+
+  const gaps = [
+    ...(chipData.dataGaps ?? []),
+    ...(chipData.institutional?.dataGaps ?? []),
+    ...(chipData.margin?.dataGaps ?? []),
+  ];
+
+  const uniqueMessages = Array.from(
+    new Set(
+      gaps
+        .map((gap) => [gap.source, gap.code, gap.message].filter(Boolean).join("："))
+        .filter((message) => message.trim().length > 0),
+    ),
+  );
+
+  return uniqueMessages.length > 0 ? uniqueMessages : ["官方資料目前未回報缺口。"];
+}
+
+function formatOfficialText(value: string | null | undefined) {
+  return value && value.trim().length > 0 ? value : "官方資料暫缺";
+}
+
+function formatOfficialInteger(value: number | null | undefined, unit = "") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "官方資料暫缺";
+  return `${value > 0 ? "+" : ""}${value.toLocaleString("zh-TW", { maximumFractionDigits: 0 })}${unit ? ` ${unit}` : ""}`;
+}
+
+function formatOfficialPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "官方資料暫缺";
+  return `${value.toLocaleString("zh-TW", { maximumFractionDigits: 2 })}%`;
+}
+
+function officialNumberTone(value: number | null | undefined): ResearchTabMetric["tone"] {
+  if (typeof value !== "number" || !Number.isFinite(value) || value === 0) return "muted";
+  return value > 0 ? "positive" : "negative";
+}
+
+function researchMetricClass(tone: ResearchTabMetric["tone"]) {
+  if (tone === "positive") return "text-emerald-200";
+  if (tone === "negative") return "text-rose-200";
+  if (tone === "muted") return "text-slate-300";
+  return "text-white";
+}
+
+function researchBadgeClass(tone: ResearchTabBadge["tone"]) {
+  if (tone === "ok") return "border-emerald-300/15 bg-emerald-300/[.06] text-emerald-100";
+  if (tone === "gap") return "border-cyan-300/15 bg-cyan-300/[.06] text-cyan-100";
+  return "border-white/[.08] bg-white/[.045] text-slate-300";
 }
 
 function formatPlainMetric(value: number | null) {

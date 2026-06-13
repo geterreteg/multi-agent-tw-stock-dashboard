@@ -56,6 +56,42 @@ export type DebateMessage = {
   tone: "support" | "risk" | "summary" | "neutral";
 };
 
+export type ChipDataGap = {
+  code?: string;
+  message?: string;
+  source?: string;
+};
+
+export type InstitutionalChipData = {
+  symbol: string;
+  asOfDate: string | null;
+  foreignNetBuy: number | null;
+  investmentTrustNetBuy: number | null;
+  dealerNetBuy: number | null;
+  institutionalNetBuyTotal: number | null;
+  source: string | null;
+  dataGaps: ChipDataGap[];
+};
+
+export type MarginChipData = {
+  symbol: string;
+  asOfDate: string | null;
+  marginBalance: number | null;
+  marginChange: number | null;
+  shortBalance: number | null;
+  shortChange: number | null;
+  marginUtilizationRate: number | null;
+  shortUtilizationRate: number | null;
+  source: string | null;
+  dataGaps: ChipDataGap[];
+};
+
+export type ChipData = {
+  institutional: InstitutionalChipData | null;
+  margin: MarginChipData | null;
+  dataGaps: ChipDataGap[];
+};
+
 export type AnalyzeResponse = {
   symbol: string;
   name: string;
@@ -98,6 +134,7 @@ export type AnalyzeResponse = {
     status: string;
     message: string;
   }>;
+  chipData?: ChipData;
   reportMarkdown: string;
   disclaimer: string;
 };
