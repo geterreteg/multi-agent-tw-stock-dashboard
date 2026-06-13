@@ -139,7 +139,8 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
   const researchReport = normalizeResearchReport(data);
   const displayedRating = data.decision?.rating ?? researchReport.recommendation ?? data.rating;
   const recommendationPreview = previewText(data.decision?.recommendationText);
-  const sourceIssues = (data.sources ?? []).filter(isSourceDegraded);
+  const hasFinMindPublicMode = hasFinMindPublicModeNotice(data, researchReport);
+  const sourceIssues = (data.sources ?? []).filter((source) => isSourceDegraded(source, hasFinMindPublicMode));
   const hasDegradedAgent = data.agents.some((agent) => agent.degraded);
   const dataQualityLabel = sourceIssues.length === 0 && !hasDegradedAgent ? "資料來源正常" : "部分資料降級";
   const dataQualityTone = sourceIssues.length === 0 && !hasDegradedAgent ? "ok" : "degraded";
@@ -157,9 +158,10 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         report={researchReport}
         recommendationPreview={recommendationPreview}
         sources={data.sources ?? []}
+        hasFinMindPublicMode={hasFinMindPublicMode}
       />
 
-      <DataQualitySummary sources={data.sources ?? []} hasDegradedAgent={hasDegradedAgent} />
+      <DataQualitySummary sources={data.sources ?? []} hasDegradedAgent={hasDegradedAgent} hasFinMindPublicMode={hasFinMindPublicMode} />
 
       <StructuredResearchReport data={data} report={researchReport} />
     </div>
@@ -194,6 +196,7 @@ function ResearchHeader({
   report,
   recommendationPreview,
   sources,
+  hasFinMindPublicMode,
 }: {
   data: AnalyzeResponse;
   dataQualityLabel: string;
@@ -203,6 +206,7 @@ function ResearchHeader({
   report: ResearchReportView;
   recommendationPreview: string;
   sources: AnalyzeResponse["sources"];
+  hasFinMindPublicMode: boolean;
 }) {
   return (
     <section className="research-surface relative isolate overflow-hidden border border-[rgba(199,183,143,.14)] bg-[rgba(6,9,11,.62)] shadow-[0_34px_120px_rgba(0,0,0,.34)]">
@@ -223,7 +227,7 @@ function ResearchHeader({
             </h1>
             <div className="border-l border-[rgba(199,183,143,.22)] pl-4 text-xs leading-6 text-slate-500">
               <p>研究期間 {data.period}</p>
-              <p>資料來源 {formatSourceNames(sources)}</p>
+              <p>資料來源 {formatSourceNames(sources, hasFinMindPublicMode)}</p>
             </div>
           </div>
           <div className="mt-8 max-w-4xl border-l border-[rgba(199,183,143,.36)] pl-5">
@@ -251,7 +255,7 @@ function ResearchHeader({
             </div>
             <div>
               <dt className="uppercase tracking-[0.16em] text-slate-500">source status</dt>
-              <dd className="mt-2 text-slate-300">{formatSourceNames(sources)}</dd>
+              <dd className="mt-2 text-slate-300">{formatSourceNames(sources, hasFinMindPublicMode)}</dd>
             </div>
           </dl>
         </aside>
@@ -262,7 +266,7 @@ function ResearchHeader({
         <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
         <QuoteStripItem label="最新收盤" value={formatPlainMetric(data.metrics.latestClose)} />
         <QuoteStripItem label="20 日報酬" value={formatSignedMetric(data.metrics.return20d, "%")} />
-        <QuoteStripItem label="資料來源" value={formatSourceNames(sources)} tone={dataQualityTone} />
+        <QuoteStripItem label="資料來源" value={formatSourceNames(sources, hasFinMindPublicMode)} tone={dataQualityTone} />
       </div>
     </section>
   );
@@ -553,7 +557,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
 
               <div className="mt-5 border-l border-[rgba(199,183,143,.28)] bg-black/15 px-4 py-4 sm:px-5">
                 <p className="text-xs font-semibold tracking-[0.16em] text-[rgb(207,224,203)]">核心結論</p>
-                <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-200">{data.decision.recommendationText}</p>
+              <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-200">{normalizeDisplayText(data.decision.recommendationText)}</p>
               </div>
 
               <div className="mt-5 grid gap-3 lg:grid-cols-3">
@@ -683,7 +687,7 @@ function ResearchBriefList({
       <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
         {visibleItems.map((item) => (
           <li key={item} className="border-t border-white/[.06] pt-2 first:border-t-0 first:pt-0">
-            {item}
+            {normalizeDisplayText(item)}
           </li>
         ))}
       </ul>
@@ -707,7 +711,7 @@ function ResearchSectionCard({
 
   return (
     <Card className={toneClass}>
-      <CardHeader className="pb-3">
+      <CardHeader className="px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <CardTitle>{title}</CardTitle>
           {badges && badges.length > 0 ? (
@@ -721,11 +725,11 @@ function ResearchSectionCard({
           ) : null}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
         {metrics && metrics.length > 0 ? (
-          <dl className="mb-4 grid gap-3">
+          <dl className="mb-3 grid gap-2.5">
             {metrics.map((metric) => (
-              <div key={`${title}-${metric.label}`} className="min-w-0 rounded-2xl border border-white/[.06] bg-slate-950/30 p-3">
+              <div key={`${title}-${metric.label}`} className="min-w-0 rounded-2xl border border-white/[.06] bg-slate-950/30 p-2.5">
                 <dt className="text-xs leading-5 text-slate-500">{metric.label}</dt>
                 <dd className={`mt-1 whitespace-nowrap font-mono text-[13px] font-semibold sm:text-sm ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
               </div>
@@ -734,8 +738,8 @@ function ResearchSectionCard({
         ) : null}
         <ul className="space-y-2 text-sm leading-6 text-slate-300">
           {(items.length > 0 ? items : ["資料暫無"]).map((item, index) => (
-            <li key={`${title}-${index}-${item}`} className="rounded-2xl border border-white/[.06] bg-slate-950/25 p-3">
-              {item}
+            <li key={`${title}-${index}-${item}`} className="rounded-2xl border border-white/[.06] bg-slate-950/25 p-2.5">
+              {normalizeDisplayText(item)}
             </li>
           ))}
         </ul>
@@ -752,7 +756,7 @@ function AgentDetailGroup({ title, items, tone = "default" }: { title: string; i
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</p>
       <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
         {visibleItems.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item}>{normalizeDisplayText(item)}</li>
         ))}
       </ul>
     </div>
@@ -760,6 +764,9 @@ function AgentDetailGroup({ title, items, tone = "default" }: { title: string; i
 }
 
 function ResearchSummaryCard({ data }: { data: AnalyzeResponse }) {
+  const report = normalizeResearchReport(data);
+  const hasFinMindPublicMode = hasFinMindPublicModeNotice(data, report);
+
   return (
     <section className="overflow-hidden rounded-3xl border border-cyan-300/15 bg-cyan-300/[.045] shadow-glass">
       <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
@@ -768,7 +775,7 @@ function ResearchSummaryCard({ data }: { data: AnalyzeResponse }) {
             <FileText className="h-5 w-5" />
             <h2 className="text-lg font-semibold text-white">綜合研究摘要</h2>
           </div>
-          <p className="mt-4 text-sm leading-8 text-slate-200">{data.decision.recommendationText}</p>
+          <p className="mt-4 text-sm leading-8 text-slate-200">{normalizeDisplayText(data.decision.recommendationText)}</p>
           <p className="mt-4 text-xs leading-5 text-slate-500">本摘要僅供課程研究與投資參考，不構成任何買賣建議。</p>
         </div>
         <aside className="border-t border-white/[.08] bg-slate-950/35 p-6 lg:border-l lg:border-t-0">
@@ -790,9 +797,9 @@ function ResearchSummaryCard({ data }: { data: AnalyzeResponse }) {
                 {(data.sources ?? []).map((source) => (
                   <Badge
                     key={`${source.name}-${source.status}`}
-                    className={isSourceDegraded(source) ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"}
+                    className={isSourceDegraded(source, hasFinMindPublicMode) ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"}
                   >
-                    {source.name}
+                      {formatSourceLabel(source, hasFinMindPublicMode)}
                   </Badge>
                 ))}
               </dd>
@@ -826,11 +833,13 @@ function DecisionColumn({ title, items, tone = "default" }: { title: string; ite
 function DataQualitySummary({
   sources,
   hasDegradedAgent,
+  hasFinMindPublicMode,
 }: {
   sources: AnalyzeResponse["sources"];
   hasDegradedAgent: boolean;
+  hasFinMindPublicMode: boolean;
 }) {
-  const degradedSources = sources.filter(isSourceDegraded);
+  const degradedSources = sources.filter((source) => isSourceDegraded(source, hasFinMindPublicMode));
   const isHealthy = degradedSources.length === 0 && !hasDegradedAgent;
 
   return (
@@ -860,13 +869,13 @@ function DataQualitySummary({
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-sm font-medium text-white">
                     <Database className="h-4 w-4 text-cyan-200" />
-                    {source.name}
+                    {formatSourceLabel(source, hasFinMindPublicMode)}
                   </span>
-                  <Badge className={isSourceDegraded(source) ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"}>
-                    {source.status}
-                  </Badge>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-500">{source.message}</p>
+                  <Badge className={isSourceDegraded(source, hasFinMindPublicMode) ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"}>
+                  {formatSourceStatus(source, hasFinMindPublicMode)}
+                </Badge>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{formatSourceMessage(source, hasFinMindPublicMode)}</p>
               </div>
             ))
           ) : (
@@ -1060,17 +1069,61 @@ function formatConfidence(value: number | null, isLegacyFallback = false) {
 
 function formatListSummary(items: string[]) {
   if (items.length === 0) return "資料暫無";
-  return items.slice(0, 2).join("；");
+  return items.slice(0, 2).map(normalizeDisplayText).join("；");
 }
 
-function isSourceDegraded(source: AnalyzeResponse["sources"][number]) {
+function isSourceDegraded(source: AnalyzeResponse["sources"][number], hasFinMindPublicMode = false) {
+  if (isFinMindPublicMode(source, hasFinMindPublicMode)) return true;
   const status = String(source.status ?? "").toLowerCase();
   return !(status === "ok" || status === "success" || status === "正常");
 }
 
+function hasFinMindPublicModeNotice(data: AnalyzeResponse, report: ResearchReportView) {
+  const texts = [
+    data.decision?.recommendationText,
+    ...(report.dataGaps ?? []),
+    ...(data.sources ?? []).map((source) => source.message),
+  ];
+
+  return texts.some((text) => {
+    const value = String(text ?? "");
+    return value.includes("未偵測到 FinMind API 權限") || value.includes("公開限制模式") || value.includes("FinMind 公開資料模式");
+  });
+}
+
+function isFinMindPublicMode(source: AnalyzeResponse["sources"][number], hasFinMindPublicMode = false) {
+  const name = String(source.name ?? "").toLowerCase();
+  const message = String(source.message ?? "");
+  return name.includes("finmind") && (hasFinMindPublicMode || message.includes("未偵測到 FinMind API 權限") || message.includes("公開限制模式") || message.includes("公開資料"));
+}
+
+function formatSourceLabel(source: AnalyzeResponse["sources"][number], hasFinMindPublicMode = false) {
+  return isFinMindPublicMode(source, hasFinMindPublicMode) ? "FinMind 公開資料模式" : source.name;
+}
+
+function formatSourceStatus(source: AnalyzeResponse["sources"][number], hasFinMindPublicMode = false) {
+  return isFinMindPublicMode(source, hasFinMindPublicMode) ? "公開資料模式" : source.status;
+}
+
+function formatSourceMessage(source: AnalyzeResponse["sources"][number], hasFinMindPublicMode = false) {
+  if (isFinMindPublicMode(source, hasFinMindPublicMode)) {
+    return "目前使用 FinMind 公開資料模式，部分欄位可能受限或延遲。";
+  }
+  return normalizeDisplayText(source.message);
+}
+
+function normalizeDisplayText(text: string) {
+  return text
+    .replaceAll("價格資料未顯示明確規則式風險", "目前未偵測到明確價格風險訊號")
+    .replaceAll("財務資料未顯示明確規則式風險", "目前財務資料未顯示明確異常")
+    .replaceAll("籌碼資料未顯示明確規則式風險", "目前籌碼資料未顯示明確壓力訊號")
+    .replaceAll("未偵測到 FinMind API 權限，已嘗試公開限制模式；部分資料可能受限。", "目前使用 FinMind 公開資料模式，部分欄位可能受限或延遲。");
+}
+
 function previewText(text: string | undefined) {
   if (!text) return "系統已完成多 Agent 分析，請參考下方技術面、基本面、籌碼面與風險控管結果。";
-  return text.length > 112 ? `${text.slice(0, 112)}...` : text;
+  const normalizedText = normalizeDisplayText(text);
+  return normalizedText.length > 112 ? `${normalizedText.slice(0, 112)}...` : normalizedText;
 }
 
 function safeNumber(value: unknown) {
@@ -1172,7 +1225,7 @@ function formatPeMetric(metrics: AnalyzeResponse["metrics"]) {
   return formatPlainMetric(metrics.peRatio);
 }
 
-function formatSourceNames(sources: AnalyzeResponse["sources"]) {
+function formatSourceNames(sources: AnalyzeResponse["sources"], hasFinMindPublicMode = false) {
   if (sources.length === 0) return "資料暫無";
-  return sources.map((source) => source.name).join(" / ");
+  return sources.map((source) => formatSourceLabel(source, hasFinMindPublicMode)).join(" / ");
 }
