@@ -494,11 +494,33 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
     <section className="overflow-hidden rounded-3xl border border-[rgba(199,183,143,.18)] bg-[rgba(7,10,12,.78)] shadow-[0_26px_90px_rgba(0,0,0,.24)]">
       <Card className="rounded-none border-0 bg-transparent shadow-none">
         <CardHeader className="border-b border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.035)]">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">investment decision</p>
-              <CardTitle className="mt-3 text-2xl">研究報告</CardTitle>
-              <p className="mt-4 text-sm leading-8 text-slate-300">{data.decision.recommendationText}</p>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+            <div className="min-w-0 rounded-3xl border border-[rgba(199,183,143,.14)] bg-[rgba(5,8,10,.42)] p-5 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">investment decision</p>
+                  <CardTitle className="mt-3 text-2xl">研究結論摘要</CardTitle>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Badge className={stanceBadgeClass(report.recommendation)}>{ratingDisplayLabel(report.recommendation)}</Badge>
+                  <Badge className="border-cyan-300/15 bg-cyan-300/[.06] text-cyan-100">
+                    信心 {formatConfidence(report.confidenceScore, report.isLegacyFallback)}
+                  </Badge>
+                  <Badge className="border-white/[.08] bg-white/[.045] text-slate-300">資料缺口 {report.dataGaps.length} 項</Badge>
+                </div>
+              </div>
+
+              <div className="mt-5 border-l border-[rgba(199,183,143,.28)] bg-black/15 px-4 py-4 sm:px-5">
+                <p className="text-xs font-semibold tracking-[0.16em] text-[rgb(207,224,203)]">核心結論</p>
+                <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-200">{data.decision.recommendationText}</p>
+              </div>
+
+              <div className="mt-5 grid gap-3 lg:grid-cols-3">
+                <ResearchBriefList title="投資論點" items={report.investmentThesis} />
+                <ResearchBriefList title="主要風險" items={report.risks} tone="risk" />
+                <ResearchBriefList title="資料缺口" items={report.dataGaps} tone="gap" />
+              </div>
+
               {report.isLegacyFallback ? (
                 <p className="mt-4 border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
                   目前顯示舊版摘要；新版結構化研究報告需搭配升級後端。舊版 API 仍可顯示原始建議理由與既有分數，不代表系統故障。
@@ -508,7 +530,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
                 {COURSE_RESEARCH_DISCLAIMER}
               </p>
             </div>
-            <div className="w-full border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5 xl:w-[280px]">
+            <div className="w-full border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5">
               <p className="text-xs tracking-[0.16em] text-slate-500">RESEARCH RATING</p>
               <Badge className={`mt-3 ${stanceBadgeClass(report.recommendation)}`}>{ratingDisplayLabel(report.recommendation)}</Badge>
               <dl className="mt-4 grid gap-3 text-xs">
@@ -594,6 +616,37 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function ResearchBriefList({
+  title,
+  items,
+  tone = "default",
+}: {
+  title: string;
+  items: string[];
+  tone?: "default" | "risk" | "gap";
+}) {
+  const visibleItems = items.length > 0 ? items.slice(0, 3) : ["資料暫無"];
+  const toneClass =
+    tone === "risk"
+      ? "border-amber-300/15 bg-amber-300/[.04]"
+      : tone === "gap"
+        ? "border-cyan-300/15 bg-cyan-300/[.035]"
+        : "border-white/[.07] bg-white/[.035]";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+      <p className="text-xs font-semibold tracking-[0.14em] text-slate-500">{title}</p>
+      <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
+        {visibleItems.map((item) => (
+          <li key={item} className="border-t border-white/[.06] pt-2 first:border-t-0 first:pt-0">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
