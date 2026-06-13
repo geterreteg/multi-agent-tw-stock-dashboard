@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -21,25 +21,17 @@ export function SearchBox() {
   }
 
   return (
-    <form onSubmit={submit} className="w-full max-w-3xl">
-      <div className="relative overflow-hidden border border-[rgba(217,204,166,.28)] bg-[rgba(235,232,221,.94)] p-3 shadow-[0_24px_80px_rgba(0,0,0,.26),0_0_0_1px_rgba(255,255,255,.1)_inset]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(39,98,91,.48)] to-transparent" />
-        <div className="mb-3 grid gap-2 px-1 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div>
-            <span className="text-xs font-semibold tracking-[0.22em] text-[rgb(27,82,77)]">RESEARCH COMMAND</span>
-            <p className="mt-1 text-xs text-[rgba(22,31,32,.68)]">輸入四位數台股代號，建立一份可追溯的研究摘要。</p>
-          </div>
-          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[rgba(22,31,32,.58)]">TWSE / TPEX</span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <form onSubmit={submit} className="w-full">
+      <div>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_118px]">
           <label className="relative block min-w-0">
             <span className="sr-only">股票代號</span>
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[rgba(32,100,93,.76)]" />
+            <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8c8377]" />
             <input
               aria-describedby={error ? "stock-search-error" : undefined}
               aria-invalid={Boolean(error)}
               aria-label="股票代號"
-              className="h-14 w-full border border-[rgba(31,42,43,.16)] bg-[rgb(242,241,236)] pl-12 pr-4 font-mono text-lg tabular-nums tracking-[0.22em] text-[rgb(16,23,24)] outline-none transition placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-[rgba(31,42,43,.5)] focus:border-[rgba(32,100,93,.55)] focus:ring-4 focus:ring-[rgba(32,100,93,.1)]"
+              className="h-11 w-full rounded-lg border border-[#dfd6ca] bg-[#fffdf9] pl-4 pr-11 text-sm text-[#2b2925] shadow-[0_10px_24px_rgba(58,50,40,.04)] outline-none transition placeholder:text-[#9a9185] focus:border-[#b8aa98] focus:ring-4 focus:ring-[#b8aa98]/[.12]"
               inputMode="numeric"
               maxLength={4}
               pattern="[0-9]{4}"
@@ -52,16 +44,15 @@ export function SearchBox() {
             />
           </label>
           <button
-            className="inline-flex h-14 items-center justify-center gap-2 border border-[rgba(31,42,43,.16)] bg-[rgb(15,22,23)] px-5 text-sm font-semibold text-[rgb(245,242,233)] shadow-[0_16px_34px_rgba(22,30,31,.18)] transition hover:bg-[rgb(31,86,81)] active:translate-y-px sm:px-7"
+            className="inline-flex h-11 items-center justify-center rounded-lg bg-[#282521] px-5 text-sm font-medium text-white shadow-[0_12px_26px_rgba(43,39,33,.18)] transition hover:bg-[#3a352f] active:translate-y-px"
             type="submit"
           >
-            建立研究摘要
-            <ArrowRight className="h-4 w-4" />
+            開始研究
           </button>
         </div>
       </div>
       {error ? (
-        <p id="stock-search-error" className="mt-3 border-l border-[rgba(170,107,39,.55)] pl-3 text-sm font-medium text-[rgb(125,74,25)]">
+        <p id="stock-search-error" className="mt-3 border-l border-[#b0834f] pl-3 text-sm font-medium text-[#7d4a19]">
           {error}
         </p>
       ) : null}
