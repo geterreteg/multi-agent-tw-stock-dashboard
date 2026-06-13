@@ -172,16 +172,17 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
 }
 
 function TechnicalScenarioPanel({ scenario }: { scenario: TechnicalScenario }) {
-  const badgeClass =
+  const statusClass =
     scenario.direction === "偏多"
-      ? "border-emerald-300/30 bg-emerald-300/[.12] text-emerald-100"
+      ? "border-emerald-300/20 bg-emerald-300/[.08] text-emerald-100"
       : scenario.direction === "偏弱"
-        ? "border-rose-300/30 bg-rose-300/[.12] text-rose-100"
-        : "border-cyan-300/25 bg-cyan-300/[.1] text-cyan-100";
+        ? "border-rose-300/20 bg-rose-300/[.08] text-rose-100"
+        : "border-cyan-300/20 bg-cyan-300/[.08] text-cyan-100";
+  const reasonGroups = groupScenarioReasons(scenario.reasons);
 
   return (
-    <section className="rounded-3xl border border-white/[.08] bg-slate-950/35 p-5 shadow-glass">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-3xl border border-white/[.08] bg-slate-950/35 p-5 shadow-glass sm:p-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.78fr)]">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">scenario analysis</p>
           <h3 className="mt-2 text-lg font-semibold text-white">K 線情境推演</h3>
@@ -189,9 +190,15 @@ function TechnicalScenarioPanel({ scenario }: { scenario: TechnicalScenario }) {
             依既有日 K、均線、20 日報酬、成交量與資料來源品質，整理可能的技術情境，不新增資料請求。
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${badgeClass}`}>目前推演方向：{scenario.direction}</span>
-          <span className="rounded-full border border-white/[.08] bg-black/20 px-3 py-1.5 text-sm font-medium text-slate-200">推演信心：{scenario.confidence}</span>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className={`rounded-2xl border p-4 ${statusClass}`}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-75">目前推演方向</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{scenario.direction}</p>
+          </div>
+          <div className="rounded-2xl border border-white/[.08] bg-black/20 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">技術推演信心</p>
+            <p className="mt-2 text-2xl font-semibold text-white">{scenario.confidence}</p>
+          </div>
         </div>
       </div>
 
@@ -201,23 +208,33 @@ function TechnicalScenarioPanel({ scenario }: { scenario: TechnicalScenario }) {
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
-        <div className="rounded-2xl border border-white/[.06] bg-black/20 p-4">
-          <p className="text-sm font-semibold text-slate-100">判斷依據</p>
-          <ul className="mt-3 grid gap-2 text-sm leading-6 text-slate-300">
-            {scenario.reasons.map((reason) => (
-              <li key={reason} className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-200/70" />
-                <span>{reason}</span>
+      <div className="mt-5 grid gap-4">
+        <div className="rounded-2xl border border-white/[.06] bg-black/20 p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-100">判斷依據</p>
+            <span className="rounded-full border border-white/[.08] px-2.5 py-1 text-[11px] text-slate-400">{reasonGroups.main.length} 項重點</span>
+          </div>
+          <ul className="mt-4 grid gap-3 text-sm leading-6 text-slate-300">
+            {reasonGroups.main.map((reason) => (
+              <li key={reason} className="rounded-xl border border-white/[.06] bg-slate-950/35 p-3">
+                <HighlightedScenarioText text={reason} />
               </li>
             ))}
           </ul>
-          <p className="mt-4 border-t border-white/[.07] pt-3 text-xs leading-6 text-slate-500">{scenario.confidenceNote}</p>
+          <div className="mt-4 rounded-xl border border-cyan-300/10 bg-cyan-300/[.035] p-3">
+            <p className="text-xs font-semibold text-cyan-100">資料限制 / 資料來源提示</p>
+            <div className="mt-2 grid gap-2 text-xs leading-6 text-slate-400">
+              {reasonGroups.dataNotes.map((reason) => (
+                <p key={reason}>{reason}</p>
+              ))}
+              <p>{scenario.confidenceNote}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2">
           {scenario.cards.map((card) => (
-            <ScenarioCardView key={card.title} card={card} />
+            <ScenarioCardView key={card.title} card={card} isActive={isPrimaryScenarioCard(scenario.direction, card)} />
           ))}
         </div>
       </div>
@@ -229,32 +246,78 @@ function TechnicalScenarioPanel({ scenario }: { scenario: TechnicalScenario }) {
   );
 }
 
-function ScenarioCardView({ card }: { card: ScenarioCard }) {
+function groupScenarioReasons(reasons: string[]) {
+  const dataNotes = reasons.filter((reason) => reason.includes("資料來源") || reason.toLowerCase().includes("fallback"));
+  const main = reasons.filter((reason) => !dataNotes.includes(reason));
+  return {
+    main: main.length > 0 ? main : ["目前主要技術訊號不足，需以後續 K 線與均線位置確認。"],
+    dataNotes: dataNotes.length > 0 ? dataNotes : ["資料來源未顯示需額外降級的限制，仍應留意資料可能延遲或不完整。"],
+  };
+}
+
+function HighlightedScenarioText({ text }: { text: string }) {
+  const highlightPattern = /(最新收盤|MA20|MA60|近 20 日報酬|成交量|量增下跌|[-+]?\d[\d,.]*%?)/g;
+  const parts = text.split(highlightPattern);
+
+  return (
+    <span>
+      {parts.map((part, index) =>
+        /^(最新收盤|MA20|MA60|近 20 日報酬|成交量|量增下跌|[-+]?\d[\d,.]*%?)$/.test(part) ? (
+          <span key={`${part}-${index}`} className="font-semibold text-cyan-100">
+            {part}
+          </span>
+        ) : (
+          <span key={`${part}-${index}`}>{part}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
+function isPrimaryScenarioCard(direction: TechnicalScenario["direction"], card: ScenarioCard) {
+  if (direction === "偏多") return card.title === "偏多路徑";
+  if (direction === "偏弱") return card.title === "偏弱延續";
+  return card.title === "中性整理";
+}
+
+function ScenarioCardView({ card, isActive }: { card: ScenarioCard; isActive: boolean }) {
   const toneClass =
     card.tone === "bullish"
       ? "border-emerald-300/15 hover:border-emerald-200/35"
       : card.tone === "weak"
         ? "border-rose-300/15 hover:border-rose-200/35"
         : "border-cyan-300/15 hover:border-cyan-200/35";
+  const toneLabel = card.tone === "bullish" ? "偏多" : card.tone === "weak" ? "偏弱" : "整理";
+  const activeClass = isActive ? "border-cyan-200/55 bg-cyan-300/[.07] shadow-[0_0_0_1px_rgba(103,232,249,.12)]" : "";
 
   return (
-    <article className={`rounded-2xl border bg-slate-950/35 p-4 transition-colors hover:bg-white/[.045] ${toneClass}`}>
-      <h4 className="text-sm font-semibold text-white">{card.title}</h4>
-      <dl className="mt-4 grid gap-3 text-xs leading-6">
-        <div>
-          <dt className="font-medium text-slate-500">觸發條件</dt>
-          <dd className="mt-1 text-slate-200">{card.trigger}</dd>
+    <article className={`rounded-2xl border bg-slate-950/35 p-4 transition-colors hover:bg-white/[.045] ${toneClass} ${activeClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <h4 className="text-sm font-semibold text-white">{card.title}</h4>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {isActive ? (
+            <span className="rounded-full border border-cyan-200/30 bg-cyan-200/[.12] px-2 py-0.5 text-[11px] font-semibold text-cyan-100">
+              目前主情境
+            </span>
+          ) : null}
+          <span className="rounded-full border border-white/[.08] px-2 py-0.5 text-[11px] text-slate-400">{toneLabel}</span>
         </div>
-        <div>
-          <dt className="font-medium text-slate-500">可能走勢</dt>
-          <dd className="mt-1 text-slate-200">{card.path}</dd>
-        </div>
-        <div>
-          <dt className="font-medium text-slate-500">觀察指標</dt>
-          <dd className="mt-1 text-slate-200">{card.watch}</dd>
-        </div>
+      </div>
+      <dl className="mt-4 grid gap-0 overflow-hidden rounded-xl border border-white/[.06] text-xs leading-6">
+        <ScenarioCardRow label="觸發條件" value={card.trigger} />
+        <ScenarioCardRow label="可能走勢" value={card.path} />
+        <ScenarioCardRow label="觀察指標" value={card.watch} />
       </dl>
     </article>
+  );
+}
+
+function ScenarioCardRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-white/[.06] bg-black/10 p-3 last:border-b-0">
+      <dt className="text-[11px] font-semibold tracking-[0.12em] text-slate-500">{label}</dt>
+      <dd className="mt-1 text-slate-200">{value}</dd>
+    </div>
   );
 }
 
