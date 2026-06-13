@@ -18,7 +18,7 @@ import {
 
 import type { AnalyzeResponse } from "@/lib/types";
 
-const axisStyle = { fill: "#64748b", fontSize: 12 };
+const axisStyle = { fill: "#8a8175", fontSize: 12 };
 type ChartMode = "close" | "candlestick";
 type ScenarioDirection = "偏多" | "中性整理" | "偏弱";
 type ScenarioConfidence = "高" | "中" | "低";
@@ -40,67 +40,96 @@ type TechnicalScenario = {
   dataLimited: boolean;
 };
 
-export function StockCharts({ data }: { data: AnalyzeResponse }) {
+export function StockCharts({ data, summary }: { data: AnalyzeResponse; summary?: ReactNode }) {
   const [chartMode, setChartMode] = useState<ChartMode>("close");
   const scenario = useMemo(() => buildTechnicalScenario(data), [data]);
 
   return (
     <div className="grid gap-5">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <ChartPanel
-          title="股價走勢"
-          description="觀察收盤價趨勢與日 K 結構，是本頁主要市場價格視圖。"
-          featured
-          action={<ChartModeSwitch value={chartMode} onChange={setChartMode} />}
-        >
-          {chartMode === "close" ? (
-            <ResponsiveContainer width="100%" height={380}>
-              <AreaChart data={data.charts.price}>
-                <defs>
-                  <linearGradient id="priceGradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
-                <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
-                <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="close" stroke="#22d3ee" fill="url(#priceGradient)" strokeWidth={2.2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <CandlestickChart data={data.charts.price} />
-          )}
-        </ChartPanel>
+      <section className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1.45fr)_minmax(280px,.95fr)]">
         <div className="grid gap-5">
-          <ChartPanel title="成交量" description="輔助判斷價格移動背後是否有量能支持。" muted>
-            <ResponsiveContainer width="100%" height={185}>
-              <BarChart data={data.charts.volume} margin={{ left: 8, right: 4 }}>
-                <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
-                <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
-                <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={formatVolumeAxis} width={58} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Bar dataKey="volume" fill="#34d399" opacity={0.52} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartPanel>
-          <ChartPanel title="均線位置" description="比較 MA20 與 MA60，輔助辨識短中期趨勢結構。" muted>
-            <ResponsiveContainer width="100%" height={185}>
-              <LineChart data={data.charts.movingAverage}>
-                <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
-                <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
-                <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="ma20" name="MA20" stroke="#22d3ee" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="ma60" name="MA60" stroke="#fbbf24" dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartPanel>
+          {summary}
+          <MovingAveragePanel data={data} height={220} />
         </div>
+        <PriceChartPanel data={data} chartMode={chartMode} setChartMode={setChartMode} height={390} />
+        <VolumePanel data={data} height={390} />
       </section>
       <TechnicalScenarioPanel scenario={scenario} />
     </div>
+  );
+}
+
+function PriceChartPanel({
+  data,
+  chartMode,
+  setChartMode,
+  height,
+}: {
+  data: AnalyzeResponse;
+  chartMode: ChartMode;
+  setChartMode: (mode: ChartMode) => void;
+  height: number;
+}) {
+  return (
+    <ChartPanel
+      title="股價走勢"
+      description="觀察收盤價趨勢與日 K 結構，是本頁主要市場價格視圖。"
+      featured
+      action={<ChartModeSwitch value={chartMode} onChange={setChartMode} />}
+    >
+      {chartMode === "close" ? (
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart data={data.charts.price}>
+            <defs>
+              <linearGradient id="priceGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="5%" stopColor="#4f7b5d" stopOpacity={0.26} />
+                <stop offset="95%" stopColor="#4f7b5d" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="rgba(138,129,117,.16)" vertical={false} />
+            <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
+            <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} />
+            <Tooltip contentStyle={tooltipStyle} />
+            <Area type="monotone" dataKey="close" stroke="#3f6f50" fill="url(#priceGradient)" strokeWidth={2.2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <CandlestickChart data={data.charts.price} />
+      )}
+    </ChartPanel>
+  );
+}
+
+function VolumePanel({ data, height }: { data: AnalyzeResponse; height: number }) {
+  return (
+    <ChartPanel title="成交量" description="輔助判斷價格移動背後是否有量能支持。" muted>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data.charts.volume} margin={{ left: 8, right: 4 }}>
+          <CartesianGrid stroke="rgba(138,129,117,.16)" vertical={false} />
+          <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
+          <YAxis tick={axisStyle} tickLine={false} axisLine={false} tickFormatter={formatVolumeAxis} width={58} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Bar dataKey="volume" fill="#4f7b5d" opacity={0.48} radius={[5, 5, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartPanel>
+  );
+}
+
+function MovingAveragePanel({ data, height }: { data: AnalyzeResponse; height: number }) {
+  return (
+    <ChartPanel title="均線位置" description="比較 MA20 與 MA60，輔助辨識短中期趨勢結構。" muted>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data.charts.movingAverage}>
+          <CartesianGrid stroke="rgba(138,129,117,.16)" vertical={false} />
+          <XAxis dataKey="date" tick={axisStyle} tickLine={false} axisLine={false} minTickGap={28} />
+          <YAxis tick={axisStyle} tickLine={false} axisLine={false} width={48} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Line type="monotone" dataKey="ma20" name="MA20" stroke="#3f6f50" dot={false} strokeWidth={2} />
+          <Line type="monotone" dataKey="ma60" name="MA60" stroke="#d49b3d" dot={false} strokeWidth={2} />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartPanel>
   );
 }
 
@@ -121,18 +150,18 @@ function ChartPanel({
 }) {
   return (
     <section
-      className={`rounded-3xl border p-5 shadow-glass ${
+      className={`rounded-2xl border p-5 shadow-[0_14px_34px_rgba(57,49,37,.05)] ${
         featured
-          ? "border-cyan-300/15 bg-white/[.055]"
+          ? "border-[#e4dccf] bg-white"
           : muted
-            ? "border-white/[.07] bg-slate-950/35"
-            : "border-white/[.08] bg-white/[.045]"
+            ? "border-[#e4dccf] bg-[#fffdf9]"
+            : "border-[#e4dccf] bg-white"
       }`}
     >
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className={featured ? "text-lg font-semibold text-white" : "text-base font-semibold text-white"}>{title}</h2>
-          <p className="mt-2 text-xs leading-5 text-slate-500">{description}</p>
+          <h2 className={featured ? "text-lg font-semibold text-[#2b2925]" : "text-base font-semibold text-[#2b2925]"}>{title}</h2>
+          <p className="mt-2 text-xs leading-5 text-[#746b60]">{description}</p>
         </div>
         {action}
       </div>
@@ -148,7 +177,7 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
   ];
 
   return (
-    <div className="flex w-fit rounded-full border border-white/[.1] bg-slate-950/60 p-1 shadow-inner shadow-black/30">
+    <div className="flex w-fit rounded-full border border-[#e4dccf] bg-[#fbf7ef] p-1">
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -156,10 +185,10 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d8ad63]/60 ${
               isActive
-                ? "border-cyan-200/70 bg-cyan-100 text-slate-950 shadow-[0_0_0_1px_rgba(103,232,249,.2),0_10px_28px_rgba(0,0,0,.26)]"
-                : "border-transparent text-slate-400 hover:border-white/[.08] hover:bg-white/[.075] hover:text-slate-100 active:bg-white/[.1]"
+                ? "border-[#e4dccf] bg-white text-[#2b2925] shadow-[0_8px_20px_rgba(57,49,37,.08)]"
+                : "border-transparent text-[#7a7166] hover:border-[#e4dccf] hover:bg-white hover:text-[#2b2925] active:bg-[#f7efe4]"
             }`}
             aria-pressed={isActive}
           >
@@ -174,72 +203,87 @@ function ChartModeSwitch({ value, onChange }: { value: ChartMode; onChange: (val
 function TechnicalScenarioPanel({ scenario }: { scenario: TechnicalScenario }) {
   const statusClass =
     scenario.direction === "偏多"
-      ? "border-emerald-300/20 bg-emerald-300/[.08] text-emerald-100"
+      ? "border-red-200 bg-red-50 text-red-700"
       : scenario.direction === "偏弱"
-        ? "border-rose-300/20 bg-rose-300/[.08] text-rose-100"
-        : "border-cyan-300/20 bg-cyan-300/[.08] text-cyan-100";
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-amber-200 bg-amber-50 text-amber-700";
   const reasonGroups = groupScenarioReasons(scenario.reasons);
 
   return (
-    <section className="rounded-3xl border border-white/[.08] bg-slate-950/35 p-5 shadow-glass sm:p-6">
+    <section className="rounded-2xl border border-[#e4dccf] bg-white p-5 shadow-[0_14px_34px_rgba(57,49,37,.05)] sm:p-6">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,.78fr)]">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">scenario analysis</p>
-          <h3 className="mt-2 text-lg font-semibold text-white">K 線情境推演</h3>
-          <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b88a45]">scenario analysis</p>
+          <h3 className="mt-2 text-lg font-semibold text-[#2b2925]">K 線情境推演</h3>
+          <p className="mt-2 max-w-3xl text-xs leading-6 text-[#746b60]">
             依既有日 K、均線、20 日報酬、成交量與資料來源品質，整理可能的技術情境，不新增資料請求。
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className={`rounded-2xl border p-4 ${statusClass}`}>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-75">目前推演方向</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{scenario.direction}</p>
+            <p className="mt-2 text-2xl font-semibold">{scenario.direction}</p>
           </div>
-          <div className="rounded-2xl border border-white/[.08] bg-black/20 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">技術推演信心</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{scenario.confidence}</p>
+          <div className="rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a8175]">技術推演信心</p>
+            <p className="mt-2 text-2xl font-semibold text-[#2b2925]">{scenario.confidence}</p>
           </div>
         </div>
       </div>
 
       {scenario.dataLimited ? (
-        <p className="mt-4 rounded-2xl border border-amber-300/15 bg-amber-300/[.045] p-3 text-xs leading-6 text-amber-100">
+        <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800">
           資料不足，僅能提供保守情境推演。
         </p>
       ) : null}
 
       <div className="mt-5 grid gap-4">
-        <div className="rounded-2xl border border-white/[.06] bg-black/20 p-4 sm:p-5">
+        <div className="rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-100">判斷依據</p>
-            <span className="rounded-full border border-white/[.08] px-2.5 py-1 text-[11px] text-slate-400">{reasonGroups.main.length} 項重點</span>
+            <p className="text-sm font-semibold text-[#2b2925]">判斷依據</p>
+            <span className="rounded-full border border-[#e4dccf] bg-white px-2.5 py-1 text-[11px] text-[#746b60]">{reasonGroups.main.length} 項重點</span>
           </div>
-          <ul className="mt-4 grid gap-3 text-sm leading-6 text-slate-300">
-            {reasonGroups.main.map((reason) => (
-              <li key={reason} className="rounded-xl border border-white/[.06] bg-slate-950/35 p-3">
-                <HighlightedScenarioText text={reason} />
+          <ul className="mt-4 grid gap-3 text-sm leading-6 text-[#514b43]">
+            {reasonGroups.main.slice(0, 3).map((reason) => (
+              <li key={reason} className="rounded-xl border border-[#eee7dd] bg-white p-3">
+                <span className="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                  <HighlightedScenarioText text={reason} />
+                </span>
               </li>
             ))}
           </ul>
-          <div className="mt-4 rounded-xl border border-cyan-300/10 bg-cyan-300/[.035] p-3">
-            <p className="text-xs font-semibold text-cyan-100">資料限制 / 資料來源提示</p>
-            <div className="mt-2 grid gap-2 text-xs leading-6 text-slate-400">
+        </div>
+
+        <details className="rounded-2xl border border-[#e4dccf] bg-white p-4">
+          <summary className="cursor-pointer select-none text-sm font-semibold text-[#2b2925]">查看完整情境推演</summary>
+          <div className="mt-4 rounded-xl border border-[#e4dccf] bg-[#fbf7ef] p-3">
+            <p className="text-xs font-semibold text-[#7d5d2e]">資料限制 / 資料來源提示</p>
+            <div className="mt-2 grid gap-2 text-xs leading-6 text-[#746b60]">
               {reasonGroups.dataNotes.map((reason) => (
                 <p key={reason}>{reason}</p>
               ))}
               <p>{scenario.confidenceNote}</p>
             </div>
           </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {scenario.cards.map((card) => (
-            <ScenarioCardView key={card.title} card={card} isActive={isPrimaryScenarioCard(scenario.direction, card)} />
-          ))}
-        </div>
+          {reasonGroups.main.length > 3 ? (
+            <div className="mt-4 rounded-xl border border-[#e4dccf] bg-[#fbf7ef] p-3">
+              <p className="text-xs font-semibold text-[#7d5d2e]">其他判斷依據</p>
+              <div className="mt-2 grid gap-2 text-xs leading-6 text-[#514b43]">
+                {reasonGroups.main.slice(3).map((reason) => (
+                  <p key={reason}>{reason}</p>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            {scenario.cards.map((card) => (
+              <ScenarioCardView key={card.title} card={card} isActive={isPrimaryScenarioCard(scenario.direction, card)} />
+            ))}
+          </div>
+        </details>
       </div>
 
-      <p className="mt-5 rounded-2xl border border-white/[.07] bg-white/[.035] p-3 text-xs leading-6 text-slate-400">
+      <p className="mt-5 rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-3 text-xs leading-6 text-[#746b60]">
         此區塊為規則式情境推演，不代表未來價格保證。
       </p>
     </section>
@@ -263,7 +307,7 @@ function HighlightedScenarioText({ text }: { text: string }) {
     <span>
       {parts.map((part, index) =>
         /^(最新收盤|MA20|MA60|近 20 日報酬|成交量|量增下跌|[-+]?\d[\d,.]*%?)$/.test(part) ? (
-          <span key={`${part}-${index}`} className="font-semibold text-cyan-100">
+          <span key={`${part}-${index}`} className="font-semibold text-[#2f6b4f]">
             {part}
           </span>
         ) : (
@@ -283,27 +327,27 @@ function isPrimaryScenarioCard(direction: TechnicalScenario["direction"], card: 
 function ScenarioCardView({ card, isActive }: { card: ScenarioCard; isActive: boolean }) {
   const toneClass =
     card.tone === "bullish"
-      ? "border-emerald-300/15 hover:border-emerald-200/35"
+      ? "border-red-200 hover:border-red-300"
       : card.tone === "weak"
-        ? "border-rose-300/15 hover:border-rose-200/35"
-        : "border-cyan-300/15 hover:border-cyan-200/35";
+        ? "border-emerald-200 hover:border-emerald-300"
+        : "border-amber-200 hover:border-amber-300";
   const toneLabel = card.tone === "bullish" ? "偏多" : card.tone === "weak" ? "偏弱" : "整理";
-  const activeClass = isActive ? "border-cyan-200/55 bg-cyan-300/[.07] shadow-[0_0_0_1px_rgba(103,232,249,.12)]" : "";
+  const activeClass = isActive ? "border-[#d8ad63] bg-[#fff8e8] shadow-[0_0_0_1px_rgba(216,173,99,.22)]" : "";
 
   return (
-    <article className={`rounded-2xl border bg-slate-950/35 p-4 transition-colors hover:bg-white/[.045] ${toneClass} ${activeClass}`}>
+    <article className={`rounded-2xl border bg-white p-4 transition-colors hover:bg-[#fffdf9] ${toneClass} ${activeClass}`}>
       <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-semibold text-white">{card.title}</h4>
+        <h4 className="text-sm font-semibold text-[#2b2925]">{card.title}</h4>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
           {isActive ? (
-            <span className="rounded-full border border-cyan-200/30 bg-cyan-200/[.12] px-2 py-0.5 text-[11px] font-semibold text-cyan-100">
+            <span className="rounded-full border border-[#d8ad63] bg-[#fff2cf] px-2 py-0.5 text-[11px] font-semibold text-[#7d5d2e]">
               目前主情境
             </span>
           ) : null}
-          <span className="rounded-full border border-white/[.08] px-2 py-0.5 text-[11px] text-slate-400">{toneLabel}</span>
+          <span className="rounded-full border border-[#e4dccf] bg-[#fbf7ef] px-2 py-0.5 text-[11px] text-[#746b60]">{toneLabel}</span>
         </div>
       </div>
-      <dl className="mt-4 grid gap-0 overflow-hidden rounded-xl border border-white/[.06] text-xs leading-6">
+      <dl className="mt-4 grid gap-0 overflow-hidden rounded-xl border border-[#eee7dd] text-xs leading-6">
         <ScenarioCardRow label="觸發條件" value={card.trigger} />
         <ScenarioCardRow label="可能走勢" value={card.path} />
         <ScenarioCardRow label="觀察指標" value={card.watch} />
@@ -314,9 +358,9 @@ function ScenarioCardView({ card, isActive }: { card: ScenarioCard; isActive: bo
 
 function ScenarioCardRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-b border-white/[.06] bg-black/10 p-3 last:border-b-0">
-      <dt className="text-[11px] font-semibold tracking-[0.12em] text-slate-500">{label}</dt>
-      <dd className="mt-1 text-slate-200">{value}</dd>
+    <div className="border-b border-[#eee7dd] bg-[#fffdf9] p-3 last:border-b-0">
+      <dt className="text-[11px] font-semibold tracking-[0.12em] text-[#8a8175]">{label}</dt>
+      <dd className="mt-1 text-[#514b43]">{value}</dd>
     </div>
   );
 }
@@ -327,7 +371,7 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
 
   if (chart.points.length === 0) {
     return (
-      <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-amber-300/15 bg-amber-300/[.045] p-6 text-center text-sm leading-6 text-amber-100">
+      <div className="flex min-h-[370px] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-6 text-amber-800">
         K 線資料暫無。後端需提供 open、high、low、close 後才能顯示 K 線圖。
       </div>
     );
@@ -338,28 +382,28 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
   const hitWidth = Math.max(candleWidth + 3, stepWidth);
 
   return (
-    <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-white/[.06] bg-slate-950/25">
-      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[380px] w-full" role="img" aria-label="K 線圖">
+    <div className="relative min-h-[370px] overflow-hidden rounded-2xl border border-[#eee7dd] bg-[#fffdf9]">
+      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[390px] w-full" role="img" aria-label="K 線圖">
         <rect width={chart.width} height={chart.height} fill="transparent" />
         {chart.yTicks.map((tick) => (
           <g key={tick.value}>
-            <line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={tick.y} y2={tick.y} stroke="rgba(148,163,184,.12)" />
-            <text x={chart.padding.left - 10} y={tick.y + 4} textAnchor="end" className="fill-slate-500 text-[11px]">
+            <line x1={chart.padding.left} x2={chart.width - chart.padding.right} y1={tick.y} y2={tick.y} stroke="rgba(138,129,117,.16)" />
+            <text x={chart.padding.left - 10} y={tick.y + 4} textAnchor="end" className="fill-[#8a8175] text-[11px]">
               {formatAxisPrice(tick.value)}
             </text>
           </g>
         ))}
         {chart.xLabels.map((label) => (
-          <text key={`${label.date}-${label.x}`} x={label.x} y={chart.height - 18} textAnchor="middle" className="fill-slate-500 text-[11px]">
+          <text key={`${label.date}-${label.x}`} x={label.x} y={chart.height - 18} textAnchor="middle" className="fill-[#8a8175] text-[11px]">
             {label.date.slice(5)}
           </text>
         ))}
         {chart.points.map((point) => {
           const rising = point.close >= point.open;
           const isHovered = hovered?.point.date === point.date;
-          const color = rising ? "#22c55e" : "#f43f5e";
-          const wickColor = rising ? "rgba(34,197,94,.82)" : "rgba(244,63,94,.82)";
-          const fillColor = rising ? "rgba(34,197,94,.34)" : "rgba(244,63,94,.34)";
+          const color = rising ? "#b94a48" : "#3f7b5d";
+          const wickColor = rising ? "rgba(185,74,72,.86)" : "rgba(63,123,93,.86)";
+          const fillColor = rising ? "rgba(185,74,72,.28)" : "rgba(63,123,93,.28)";
           const bodyTop = Math.min(point.openY, point.closeY);
           const bodyHeight = Math.max(1.5, Math.abs(point.closeY - point.openY));
           return (
@@ -375,7 +419,7 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
                   y={chart.padding.top}
                   width={hitWidth}
                   height={chart.height - chart.padding.top - chart.padding.bottom}
-                  fill="rgba(148,163,184,.08)"
+                  fill="rgba(216,173,99,.12)"
                 />
               ) : null}
               <line x1={point.x} x2={point.x} y1={point.highY} y2={point.lowY} stroke={wickColor} strokeWidth={isHovered ? 1.9 : 1.45} />
@@ -402,10 +446,10 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
       </svg>
       {hovered ? (
         <div
-          className="pointer-events-none fixed z-50 rounded-2xl border border-white/[.1] bg-slate-950/95 px-4 py-3 text-xs leading-5 text-slate-200 shadow-2xl"
+          className="pointer-events-none fixed z-50 rounded-2xl border border-[#e4dccf] bg-white px-4 py-3 text-xs leading-5 text-[#514b43] shadow-[0_20px_44px_rgba(57,49,37,.18)]"
           style={{ left: Math.min(hovered.x + 14, window.innerWidth - 190), top: Math.max(hovered.y - 84, 12) }}
         >
-          <p className="font-medium text-white">{hovered.point.date}</p>
+          <p className="font-medium text-[#2b2925]">{hovered.point.date}</p>
           <p>開盤：{formatCompactPrice(hovered.point.open)}</p>
           <p>最高：{formatCompactPrice(hovered.point.high)}</p>
           <p>最低：{formatCompactPrice(hovered.point.low)}</p>
@@ -697,8 +741,9 @@ function formatVolumeAxis(value: number | string) {
 }
 
 const tooltipStyle = {
-  background: "rgba(15,23,42,.94)",
-  border: "1px solid rgba(148,163,184,.22)",
+  background: "#fffdf9",
+  border: "1px solid #e4dccf",
   borderRadius: "14px",
-  color: "#e2e8f0",
+  color: "#514b43",
+  boxShadow: "0 18px 38px rgba(57,49,37,.12)",
 };

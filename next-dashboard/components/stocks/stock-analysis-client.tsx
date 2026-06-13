@@ -14,6 +14,7 @@ import type { AnalyzeResponse } from "@/lib/types";
 const COURSE_RESEARCH_DISCLAIMER =
   "本系統僅供課程研究與資料分析展示，所有評級與建議皆為規則式模型輸出，不構成正式投資建議或獲利保證。";
 const RETRY_DELAY_MS = 1_500;
+const TAB_CARD_PREVIEW_LIMIT = 3;
 
 type ResearchReportView = {
   isLegacyFallback: boolean;
@@ -114,20 +115,20 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
 
   if (isLoading) {
     return (
-      <div className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-8 text-cyan-50">
-        <Loader2 className="mb-4 h-8 w-8 animate-spin" />
+      <div className="rounded-3xl border border-[#e4dccf] bg-[#fffdf9] p-8 text-[#2b2925] shadow-[0_20px_50px_rgba(57,49,37,.08)]">
+        <Loader2 className="mb-4 h-8 w-8 animate-spin text-[#2f6b4f]" />
         <h1 className="text-2xl font-semibold">正在取得股票分析資料</h1>
-        <p className="mt-3 text-sm leading-7 text-cyan-100/80">系統正在呼叫 FastAPI，若資料來源較慢會自動逾時並顯示提示。</p>
+        <p className="mt-3 text-sm leading-7 text-[#746b60]">系統正在呼叫 FastAPI，若資料來源較慢會自動逾時並顯示提示。</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 p-8 text-amber-50">
-        <AlertTriangle className="mb-4 h-8 w-8" />
+      <div className="rounded-3xl border border-[#ead6ad] bg-[#fff9ee] p-8 text-[#4d3b1f] shadow-[0_20px_50px_rgba(57,49,37,.08)]">
+        <AlertTriangle className="mb-4 h-8 w-8 text-[#b7791f]" />
         <h1 className="text-2xl font-semibold">暫時無法取得分析資料</h1>
-        <p className="mt-3 text-sm leading-7 text-amber-100/80">{error}</p>
+        <p className="mt-3 text-sm leading-7 text-[#7a6140]">{error}</p>
         <Button className="mt-6" variant="secondary" onClick={() => loadAnalysis({ allowAutoRetry: false })}>
           重新取得分析
         </Button>
@@ -146,7 +147,7 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
   const dataQualityTone = sourceIssues.length === 0 && !hasDegradedAgent ? "ok" : "degraded";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 font-['Noto_Serif_TC','Songti_TC','PMingLiU',serif] text-[#2b2925]">
       {isCachedResult ? <CachedAnalysisNotice onRetry={() => loadAnalysis({ allowAutoRetry: false })} /> : null}
 
       <ResearchHeader
@@ -160,8 +161,6 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
         sources={data.sources ?? []}
         hasFinMindPublicMode={hasFinMindPublicMode}
       />
-
-      <DataQualitySummary sources={data.sources ?? []} hasDegradedAgent={hasDegradedAgent} hasFinMindPublicMode={hasFinMindPublicMode} />
 
       <StructuredResearchReport data={data} report={researchReport} />
     </div>
@@ -209,85 +208,76 @@ function ResearchHeader({
   hasFinMindPublicMode: boolean;
 }) {
   return (
-    <section className="research-surface relative isolate overflow-hidden border border-[rgba(199,183,143,.14)] bg-[rgba(6,9,11,.62)] shadow-[0_34px_120px_rgba(0,0,0,.34)]">
-      <div className="absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-[rgba(199,183,143,.36)] to-transparent" />
-      <div className="absolute right-[-14%] top-[-20%] -z-10 h-96 w-96 rounded-full bg-[rgba(94,137,132,.13)] blur-3xl" />
-      <div className="absolute left-[28%] top-0 -z-10 h-full w-px bg-[rgba(199,183,143,.1)]" />
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="p-5 sm:p-8 lg:p-10">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-            <span className="font-mono uppercase tracking-[0.24em] text-[rgba(199,183,143,.72)]">equity research masthead</span>
-            <span className="text-slate-500">期間：{data.period}</span>
-            <span className="text-slate-500">最後更新：{data.lastUpdated}</span>
+    <section className="overflow-hidden rounded-3xl border border-[#e4dccf] bg-[#fffdf9] shadow-[0_24px_70px_rgba(57,49,37,.08)]">
+      <div className="grid gap-6 p-5 sm:p-8 xl:grid-cols-[minmax(0,1fr)_320px] xl:p-10">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#8a8175]">
+            <span className="font-semibold uppercase tracking-[0.24em] text-[#b88a45]">equity research masthead</span>
+            <span>研究期間 {data.period}</span>
+            <span>最後更新：{data.lastUpdated}</span>
           </div>
-          <div className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <h1 className="text-balance text-4xl font-semibold leading-none tracking-tight text-[rgb(244,241,232)] sm:text-6xl">
-              <span className="font-mono tabular-nums">{data.symbol}</span>{" "}
-              <span>{data.name}</span>
-            </h1>
-            <div className="border-l border-[rgba(199,183,143,.22)] pl-4 text-xs leading-6 text-slate-500">
-              <p>研究期間 {data.period}</p>
-              <p>資料來源 {formatSourceNames(sources, hasFinMindPublicMode)}</p>
-            </div>
-          </div>
-          <div className="mt-8 max-w-4xl border-l border-[rgba(199,183,143,.36)] pl-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgb(207,224,203)]">recommendation preview</p>
-            <p className="mt-3 text-base leading-8 text-slate-300">{recommendationPreview}</p>
+          <p className="mt-2 text-xs leading-6 text-[#766d62]">資料來源：{formatSourceNames(sources, hasFinMindPublicMode)}</p>
+          <h1 className="mt-6 break-words text-5xl font-semibold leading-none tracking-tight text-[#24221f] sm:text-6xl lg:text-7xl">
+            <span className="tabular-nums">{data.symbol}</span>{" "}
+            <span>{data.name}</span>
+          </h1>
+          <div className="mt-6 max-w-4xl border-l border-[#e2cfac] pl-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#b88a45]">recommendation preview</p>
+            <p className="mt-3 text-sm leading-8 text-[#514b43]">{recommendationPreview}</p>
           </div>
         </div>
-        <aside className="border-t border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.045)] p-5 sm:p-8 lg:border-l lg:border-t-0">
+        <aside className="rounded-3xl border border-[#ddd3c6] bg-[#fbf7ef] p-5 shadow-[0_18px_46px_rgba(57,49,37,.06)] sm:p-6">
           <div className={verdictSealClass(displayedRating)}>
-            <p className="text-xs tracking-[0.24em] opacity-70">綜合判斷</p>
+            <p className="text-xs font-semibold tracking-[0.18em] opacity-75">綜合判斷</p>
             <p className="mt-4 text-3xl font-semibold tracking-tight">{ratingDisplayLabel(displayedRating)}</p>
           </div>
-          <dl className="mt-6 grid gap-3 text-xs leading-5 text-slate-400">
-            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
-              <dt>信心分數</dt>
-              <dd className="font-mono text-[rgb(244,241,232)]">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
+          <dl className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#e5ddd2] bg-white text-sm">
+            <div className="border-r border-[#e5ddd2] p-4">
+              <dt className="text-xs text-[#8a8175]">信心分數</dt>
+              <dd className="mt-2 text-2xl font-semibold tabular-nums text-[#2f6b4f]">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
             </div>
-            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
-              <dt>資料缺口</dt>
-              <dd className="font-medium text-[rgb(244,241,232)]">{report.dataGaps.length} 項</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-white/[.07] pb-3">
-              <dt>資料品質</dt>
-              <dd className="font-medium text-[rgb(244,241,232)]">{dataQualityLabel}</dd>
-            </div>
-            <div>
-              <dt className="uppercase tracking-[0.16em] text-slate-500">source status</dt>
-              <dd className="mt-2 text-slate-300">{formatSourceNames(sources, hasFinMindPublicMode)}</dd>
+            <div className="p-4">
+              <dt className="text-xs text-[#8a8175]">資料缺口</dt>
+              <dd className="mt-2 text-2xl font-semibold tabular-nums text-[#5e4631]">{report.dataGaps.length} 項</dd>
             </div>
           </dl>
+          <p className="mt-4 text-xs leading-6 text-[#746b60]">來源狀態：{formatSourceNames(sources, hasFinMindPublicMode)}</p>
         </aside>
       </div>
-      <div className="grid border-t border-[rgba(199,183,143,.12)] bg-[rgba(5,8,10,.64)] sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 border-t border-[#e8e0d5] bg-[#fbf7ef] p-3 sm:grid-cols-2 xl:grid-cols-5">
         <QuoteStripItem label="綜合分數" value={formatScore(finalScore)} />
-        <QuoteStripItem label="信心分數" value={formatConfidence(report.confidenceScore, report.isLegacyFallback)} />
-        <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
         <QuoteStripItem label="最新收盤" value={formatPlainMetric(data.metrics.latestClose)} />
         <QuoteStripItem label="20 日報酬" value={formatSignedMetric(data.metrics.return20d, "%")} />
-        <QuoteStripItem label="資料來源" value={formatSourceNames(sources, hasFinMindPublicMode)} tone={dataQualityTone} />
+        <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
+        <QuoteStripItem label="來源狀態" value={formatSourceNames(sources, hasFinMindPublicMode)} tone={dataQualityTone} />
       </div>
     </section>
   );
 }
 
 function stanceBadgeClass(stance: string) {
-  if (stance.includes("Buy")) return "border-emerald-300/20 bg-emerald-300/10 text-emerald-100";
-  if (stance.includes("Sell")) return "border-amber-300/20 bg-amber-300/10 text-amber-100";
-  return "border-cyan-300/20 bg-cyan-300/10 text-cyan-100";
+  if (isBuyStance(stance)) return "border-red-200 bg-red-50 text-red-700";
+  if (isSellStance(stance)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 function verdictSealClass(stance: string) {
-  const base =
-    "border px-6 py-5 text-center shadow-[0_28px_90px_rgba(0,0,0,.22)]";
-  if (stance.includes("Buy")) {
-    return `${base} border-[rgba(140,174,145,.42)] bg-[rgba(74,104,82,.18)] text-[rgb(207,224,203)]`;
+  const base = "rounded-2xl border px-6 py-5 text-center shadow-[0_18px_42px_rgba(57,49,37,.06)]";
+  if (isBuyStance(stance)) {
+    return `${base} border-red-200 bg-red-50 text-red-700`;
   }
-  if (stance.includes("Sell")) {
-    return `${base} border-[rgba(202,162,103,.42)] bg-[rgba(130,91,45,.16)] text-[rgb(234,204,153)]`;
+  if (isSellStance(stance)) {
+    return `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
   }
-  return `${base} border-[rgba(199,183,143,.42)] bg-[rgba(93,86,66,.18)] text-[rgb(229,218,190)]`;
+  return `${base} border-amber-200 bg-amber-50 text-amber-700`;
+}
+
+function isBuyStance(stance: string) {
+  return /Buy|買進|偏多|強烈買進|買進傾向/i.test(stance);
+}
+
+function isSellStance(stance: string) {
+  return /Sell|賣出|偏空|偏弱|賣出傾向/i.test(stance);
 }
 
 function QuoteStripItem({
@@ -301,15 +291,15 @@ function QuoteStripItem({
 }) {
   const toneClass =
     tone === "ok"
-      ? "text-[rgb(194,211,196)]"
+      ? "text-[#2f6b4f]"
       : tone === "degraded"
-        ? "text-[rgb(232,190,128)]"
-        : "text-[rgb(244,241,232)]";
+        ? "text-[#b7791f]"
+        : "text-[#2b2925]";
 
   return (
-    <div className="min-w-0 border-b border-white/[.08] p-4 last:border-b-0 sm:border-r xl:border-b-0 xl:last:border-r-0">
-      <p className="text-xs tracking-[0.18em] text-slate-500">{label}</p>
-      <p className={`mt-2 break-words font-mono text-lg font-semibold tabular-nums ${toneClass}`}>{value}</p>
+    <div className="min-w-0 rounded-2xl border border-[#e4dccf] bg-white px-4 py-3 shadow-[0_8px_22px_rgba(57,49,37,.04)]">
+      <p className="text-xs tracking-[0.12em] text-[#8a8175]">{label}</p>
+      <p className={`mt-2 break-words text-lg font-semibold tabular-nums ${toneClass}`}>{value}</p>
     </div>
   );
 }
@@ -534,75 +524,18 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
   const reportTabs = buildResearchTabs(data, report);
   const activePanel = reportTabs.find((tab) => tab.id === activeTab) ?? reportTabs[0];
   const ActiveIcon = activePanel.icon;
+  const isRiskPanel = activePanel.id === "risk";
+  const leftPanelGroups = isRiskPanel ? activePanel.groups.filter((group) => group.title === "官方資料缺口") : [];
+  const mainPanelGroups = isRiskPanel ? activePanel.groups.filter((group) => group.title !== "官方資料缺口") : activePanel.groups;
+  const summaryPanel = <TabSummaryPanel panel={activePanel} icon={ActiveIcon} extraGroups={leftPanelGroups} />;
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-[rgba(199,183,143,.18)] bg-[rgba(7,10,12,.78)] shadow-[0_26px_90px_rgba(0,0,0,.24)]">
+    <section className="overflow-hidden rounded-3xl border border-[#e4dccf] bg-[#fffdf9] shadow-[0_24px_70px_rgba(57,49,37,.07)]">
       <Card className="rounded-none border-0 bg-transparent shadow-none">
-        <CardHeader className="border-b border-[rgba(199,183,143,.12)] bg-[rgba(199,183,143,.035)]">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
-            <div className="min-w-0 rounded-3xl border border-[rgba(199,183,143,.14)] bg-[rgba(5,8,10,.42)] p-5 sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[rgba(199,183,143,.72)]">investment decision</p>
-                  <CardTitle className="mt-3 text-2xl">研究結論摘要</CardTitle>
-                </div>
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <Badge className={stanceBadgeClass(report.recommendation)}>{ratingDisplayLabel(report.recommendation)}</Badge>
-                  <Badge className="border-cyan-300/15 bg-cyan-300/[.06] text-cyan-100">
-                    信心 {formatConfidence(report.confidenceScore, report.isLegacyFallback)}
-                  </Badge>
-                  <Badge className="border-white/[.08] bg-white/[.045] text-slate-300">資料缺口 {report.dataGaps.length} 項</Badge>
-                </div>
-              </div>
-
-              <div className="mt-5 border-l border-[rgba(199,183,143,.28)] bg-black/15 px-4 py-4 sm:px-5">
-                <p className="text-xs font-semibold tracking-[0.16em] text-[rgb(207,224,203)]">核心結論</p>
-              <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-200">{normalizeDisplayText(data.decision.recommendationText)}</p>
-              </div>
-
-              <div className="mt-5 grid gap-3 lg:grid-cols-3">
-                <ResearchBriefList title="投資論點" items={report.investmentThesis} />
-                <ResearchBriefList title="主要風險" items={report.risks} tone="risk" />
-                <ResearchBriefList title="資料缺口" items={report.dataGaps} tone="gap" />
-              </div>
-
-              {report.isLegacyFallback ? (
-                <p className="mt-4 border border-cyan-300/15 bg-cyan-300/[.045] p-3 text-xs leading-6 text-cyan-100/85">
-                  目前顯示舊版摘要；新版結構化研究報告需搭配升級後端。舊版 API 仍可顯示原始建議理由與既有分數，不代表系統故障。
-                </p>
-              ) : null}
-              <p className="mt-4 border border-amber-300/15 bg-amber-300/[.045] p-3 text-xs leading-6 text-amber-100/85">
-                {COURSE_RESEARCH_DISCLAIMER}
-              </p>
-            </div>
-            <div className="w-full border border-[rgba(199,183,143,.16)] bg-[rgba(5,8,10,.52)] p-5">
-              <p className="text-xs tracking-[0.16em] text-slate-500">RESEARCH RATING</p>
-              <Badge className={`mt-3 ${stanceBadgeClass(report.recommendation)}`}>{ratingDisplayLabel(report.recommendation)}</Badge>
-              <dl className="mt-4 grid gap-3 text-xs">
-                <div>
-                  <dt className="text-slate-500">信心分數</dt>
-                  <dd className="mt-1 font-mono text-2xl font-semibold text-white">{formatConfidence(report.confidenceScore, report.isLegacyFallback)}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">資料缺口</dt>
-                  <dd className="mt-1 text-slate-300">{formatListSummary(report.dataGaps)}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">主要風險</dt>
-                  <dd className="mt-1 text-slate-300">{formatListSummary(report.risks)}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">反方觀點</dt>
-                  <dd className="mt-1 text-slate-300">{formatListSummary(report.variantView)}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
-          <div className="border-b border-white/[.07] bg-slate-950/25 px-3 py-3 sm:px-5">
+          <div className="border-b border-[#e8e0d5] bg-[#fffdf9] px-3 py-3 sm:px-5">
             <div className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex min-w-max gap-2 rounded-full border border-white/[.08] bg-black/20 p-1">
+              <div className="flex min-w-max gap-2 rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-1">
                 {reportTabs.map((tab) => {
                   const isActive = tab.id === activePanel.id;
                   const Icon = tab.icon;
@@ -612,10 +545,10 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/70 ${
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d8ad63]/60 ${
                         isActive
-                          ? "bg-[rgb(229,218,190)] text-slate-950 shadow-[0_10px_30px_rgba(0,0,0,.22)]"
-                          : "text-slate-400 hover:bg-white/[.07] hover:text-slate-100"
+                          ? "bg-white text-[#2b2925] shadow-[0_10px_24px_rgba(57,49,37,.08)]"
+                          : "text-[#7a7166] hover:bg-white/70 hover:text-[#2b2925]"
                       }`}
                       aria-pressed={isActive}
                     >
@@ -628,39 +561,58 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             </div>
           </div>
 
-          <div className="grid gap-5 p-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:p-6">
-            <aside className="border border-white/[.07] bg-slate-950/25 p-5">
-              <div className="flex items-center gap-2 text-[rgb(229,218,190)]">
-                <ActiveIcon className="h-5 w-5" />
-                <p className="text-sm font-semibold">{activePanel.label}</p>
-              </div>
-              <p className="mt-3 text-xs leading-6 text-slate-500">{activePanel.description}</p>
-              {activePanel.highlights && activePanel.highlights.length > 0 ? (
-                <dl className="mt-5 grid gap-2 border-t border-white/[.07] pt-4">
-                  {activePanel.highlights.map((item) => (
-                    <div key={item.label} className="flex items-start justify-between gap-3 text-xs">
-                      <dt className="shrink-0 text-slate-500">{item.label}</dt>
-                      <dd className="min-w-0 text-right font-medium leading-5 text-slate-200">{item.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
-            </aside>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {activePanel.showCharts ? (
-                <div className="md:col-span-2">
-                  <StockCharts data={data} />
-                </div>
-              ) : null}
-              {activePanel.groups.map((group) => (
-                <ResearchSectionCard key={group.title} {...group} />
-              ))}
+          {activePanel.showCharts ? (
+            <div className="grid gap-5 p-5 lg:p-6">
+              <StockCharts data={data} summary={summaryPanel} />
+              <TabDetailsDisclosure groups={activePanel.groups} label="查看技術面文字摘要" />
             </div>
-          </div>
+          ) : (
+            <div className="grid gap-5 p-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start lg:p-6">
+              {summaryPanel}
+              <div className={`min-w-0 grid gap-4 ${isRiskPanel ? "md:grid-cols-2 xl:grid-cols-2" : "md:grid-cols-2"}`}>
+                {activePanel.showCharts ? (
+                  <div className="md:col-span-2">
+                    <StockCharts data={data} />
+                  </div>
+                ) : null}
+                {activePanel.showCharts ? (
+                <TabDetailsDisclosure groups={activePanel.groups} label="查看技術面文字摘要" />
+                ) : (
+                  mainPanelGroups.map((group) => <ResearchSectionCard key={group.title} {...group} />)
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function TabSummaryPanel({ panel, icon: Icon, extraGroups = [] }: { panel: ResearchTab; icon: LucideIcon; extraGroups?: ResearchTabGroup[] }) {
+  return (
+    <div className="grid self-start gap-4">
+      <aside className="rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-5 shadow-[0_12px_30px_rgba(57,49,37,.045)]">
+        <div className="flex items-center gap-2 text-[#7d5d2e]">
+          <Icon className="h-5 w-5" />
+          <p className="text-sm font-semibold">{panel.label}</p>
+        </div>
+        <p className="mt-3 text-xs leading-6 text-[#746b60]">{panel.description}</p>
+        {panel.highlights && panel.highlights.length > 0 ? (
+          <dl className="mt-5 grid gap-2.5 border-t border-[#e4dccf] pt-4">
+            {panel.highlights.map((item) => (
+              <div key={item.label} className="flex items-start justify-between gap-3 text-xs leading-5">
+                <dt className="shrink-0 text-[#8a8175]">{item.label}</dt>
+                <dd className="min-w-0 text-right font-medium leading-5 text-[#2b2925]">{item.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </aside>
+      {extraGroups.map((group) => (
+        <ResearchSectionCard key={group.title} {...group} />
+      ))}
+    </div>
   );
 }
 
@@ -676,17 +628,17 @@ function ResearchBriefList({
   const visibleItems = items.length > 0 ? items.slice(0, 3) : ["資料暫無"];
   const toneClass =
     tone === "risk"
-      ? "border-amber-300/15 bg-amber-300/[.04]"
+      ? "border-amber-200 bg-amber-50/70"
       : tone === "gap"
-        ? "border-cyan-300/15 bg-cyan-300/[.035]"
-        : "border-white/[.07] bg-white/[.035]";
+        ? "border-[#d7c7ad] bg-[#fbf7ef]"
+        : "border-[#e4dccf] bg-white";
 
   return (
     <div className={`rounded-2xl border p-4 ${toneClass}`}>
-      <p className="text-xs font-semibold tracking-[0.14em] text-slate-500">{title}</p>
-      <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
+      <p className="text-xs font-semibold tracking-[0.14em] text-[#8a8175]">{title}</p>
+      <ul className="mt-3 space-y-2 text-xs leading-5 text-[#514b43]">
         {visibleItems.map((item) => (
-          <li key={item} className="border-t border-white/[.06] pt-2 first:border-t-0 first:pt-0">
+          <li key={item} className="border-t border-[#eee7dd] pt-2 first:border-t-0 first:pt-0">
             {normalizeDisplayText(item)}
           </li>
         ))}
@@ -702,18 +654,24 @@ function ResearchSectionCard({
   badges,
   metrics,
 }: ResearchTabGroup) {
+  const visibleMetrics = (metrics ?? []).slice(0, TAB_CARD_PREVIEW_LIMIT);
+  const hiddenMetrics = (metrics ?? []).slice(TAB_CARD_PREVIEW_LIMIT);
+  const normalizedItems = items.length > 0 ? items : ["資料暫無"];
+  const visibleItems = normalizedItems.slice(0, TAB_CARD_PREVIEW_LIMIT);
+  const hiddenItems = normalizedItems.slice(TAB_CARD_PREVIEW_LIMIT);
+  const hasHiddenContent = hiddenMetrics.length > 0 || hiddenItems.length > 0;
   const toneClass =
     tone === "risk"
-      ? "border-amber-300/15 bg-amber-300/[.045]"
+      ? "border-amber-200 bg-amber-50/70"
       : tone === "gap"
-        ? "border-cyan-300/15 bg-cyan-300/[.04]"
-        : "border-white/[.08] bg-white/[.035]";
+        ? "border-[#d7c7ad] bg-[#fbf7ef]"
+        : "border-[#e4dccf] bg-white";
 
   return (
-    <Card className={toneClass}>
+    <Card className={`h-full rounded-2xl shadow-[0_14px_34px_rgba(57,49,37,.05)] ${toneClass}`}>
       <CardHeader className="px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className="text-base text-[#2b2925]">{title}</CardTitle>
           {badges && badges.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {badges.map((badge) => (
@@ -726,25 +684,60 @@ function ResearchSectionCard({
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-        {metrics && metrics.length > 0 ? (
+        {visibleMetrics.length > 0 ? (
           <dl className="mb-3 grid gap-2.5">
-            {metrics.map((metric) => (
-              <div key={`${title}-${metric.label}`} className="min-w-0 rounded-2xl border border-white/[.06] bg-slate-950/30 p-2.5">
-                <dt className="text-xs leading-5 text-slate-500">{metric.label}</dt>
-                <dd className={`mt-1 whitespace-nowrap font-mono text-[13px] font-semibold sm:text-sm ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
+            {visibleMetrics.map((metric) => (
+              <div key={`${title}-${metric.label}`} className="min-w-0 rounded-xl border border-[#eee7dd] bg-[#fffdf9] p-2.5">
+                <dt className="text-xs leading-5 text-[#8a8175]">{metric.label}</dt>
+                <dd className={`mt-1 whitespace-nowrap text-[13px] font-semibold tabular-nums sm:text-sm ${researchMetricClass(metric.tone)}`}>{metric.value}</dd>
               </div>
             ))}
           </dl>
         ) : null}
-        <ul className="space-y-2 text-sm leading-6 text-slate-300">
-          {(items.length > 0 ? items : ["資料暫無"]).map((item, index) => (
-            <li key={`${title}-${index}-${item}`} className="rounded-2xl border border-white/[.06] bg-slate-950/25 p-2.5">
-              {normalizeDisplayText(item)}
+        <ul className="space-y-2 text-sm leading-6 text-[#514b43]">
+          {visibleItems.map((item, index) => (
+            <li key={`${title}-${index}-${item}`} className="rounded-xl border border-[#eee7dd] bg-[#fffdf9] p-2.5">
+              <span className="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                {normalizeDisplayText(item)}
+              </span>
             </li>
           ))}
         </ul>
+        {hasHiddenContent ? (
+          <details className="mt-3 rounded-xl border border-[#eee7dd] bg-white px-3 py-2 text-sm text-[#514b43]">
+            <summary className="cursor-pointer select-none text-xs font-semibold text-[#7d5d2e]">查看完整內容</summary>
+            <div className="mt-3 grid gap-2">
+              {hiddenMetrics.map((metric) => (
+                <div key={`${title}-hidden-${metric.label}`} className="rounded-lg border border-[#eee7dd] bg-[#fffdf9] p-2">
+                  <p className="text-xs text-[#8a8175]">{metric.label}</p>
+                  <p className={`mt-1 text-sm font-semibold tabular-nums ${researchMetricClass(metric.tone)}`}>{metric.value}</p>
+                </div>
+              ))}
+              {hiddenItems.map((item, index) => (
+                <p key={`${title}-hidden-${index}-${item}`} className="rounded-lg border border-[#eee7dd] bg-[#fffdf9] p-2 text-xs leading-6">
+                  {normalizeDisplayText(item)}
+                </p>
+              ))}
+            </div>
+          </details>
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function TabDetailsDisclosure({ groups, label }: { groups: ResearchTabGroup[]; label: string }) {
+  if (groups.length === 0) return null;
+
+  return (
+    <details className="md:col-span-2 rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-4 shadow-[0_12px_30px_rgba(57,49,37,.045)]">
+      <summary className="cursor-pointer select-none text-sm font-semibold text-[#2b2925]">{label}</summary>
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        {groups.map((group) => (
+          <ResearchSectionCard key={group.title} {...group} />
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -1189,16 +1182,16 @@ function officialNumberTone(value: number | null | undefined): ResearchTabMetric
 }
 
 function researchMetricClass(tone: ResearchTabMetric["tone"]) {
-  if (tone === "positive") return "text-emerald-200";
-  if (tone === "negative") return "text-rose-200";
-  if (tone === "muted") return "text-slate-300";
-  return "text-white";
+  if (tone === "positive") return "text-red-700";
+  if (tone === "negative") return "text-emerald-700";
+  if (tone === "muted") return "text-[#8a8175]";
+  return "text-[#2b2925]";
 }
 
 function researchBadgeClass(tone: ResearchTabBadge["tone"]) {
-  if (tone === "ok") return "border-emerald-300/15 bg-emerald-300/[.06] text-emerald-100";
-  if (tone === "gap") return "border-cyan-300/15 bg-cyan-300/[.06] text-cyan-100";
-  return "border-white/[.08] bg-white/[.045] text-slate-300";
+  if (tone === "ok") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (tone === "gap") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-[#e4dccf] bg-white text-[#746b60]";
 }
 
 function formatPlainMetric(value: number | null) {
