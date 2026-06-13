@@ -147,7 +147,7 @@ export function StockAnalysisClient({ symbol }: { symbol: string }) {
   const dataQualityTone = sourceIssues.length === 0 && !hasDegradedAgent ? "ok" : "degraded";
 
   return (
-    <div className="space-y-5 font-['Noto_Serif_TC','Songti_TC','PMingLiU',serif] text-[#2b2925]">
+    <div className="w-full max-w-none space-y-5 font-['Noto_Serif_TC','Songti_TC','PMingLiU',serif] text-[#2b2925]">
       {isCachedResult ? <CachedAnalysisNotice onRetry={() => loadAnalysis({ allowAutoRetry: false })} /> : null}
 
       <ResearchHeader

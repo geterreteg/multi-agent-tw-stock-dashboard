@@ -22,7 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-Hant" className="dark">
       <body>
         <MobileTopBar />
-        <div className="relative mx-auto flex min-h-screen max-w-[1540px]">
+        <div className="relative flex min-h-screen w-full">
           <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-[#e7dfd3] bg-[#fbf8f2] p-6 text-[#2b2925] lg:block">
             <Link href="/" className="flex items-center gap-3">
               <div className="rounded-lg border border-[#ded5c8] bg-white p-3 text-[#2f6b4f] shadow-sm">
@@ -97,7 +97,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </svg>
             </div>
           </aside>
-          <main className="w-full bg-[#fbf8f2] px-5 py-6 sm:px-8 lg:px-10">{children}</main>
+          <main className="min-w-0 flex-1 bg-[#fbf8f2] px-5 py-6 sm:px-8 lg:px-10">{children}</main>
         </div>
       </body>
     </html>
