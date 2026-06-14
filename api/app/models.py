@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-Rating = Literal["偏多", "中立", "偏空"]
+Rating = Literal["Strong Buy / 強烈看多", "Buy / 看多", "Neutral / 中性", "Sell / 看空", "Strong Sell / 強烈看空"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -30,6 +30,9 @@ class MetricSnapshot(BaseModel):
 
 class PricePoint(BaseModel):
     date: str
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
     close: Optional[float] = None
 
 
@@ -71,19 +74,71 @@ class DebateMessage(BaseModel):
     tone: Literal["support", "risk", "summary", "neutral"]
 
 
+class EquityResearchReport(BaseModel):
+    investmentThesis: list[str]
+    keyMetrics: list[str]
+    businessQuality: list[str]
+    financialAnalysis: list[str]
+    valuation: list[str]
+    catalysts: list[str]
+    risks: list[str]
+    variantView: list[str]
+    recommendation: Rating
+    confidenceScore: int = Field(..., ge=0, le=100)
+    dataGaps: list[str]
+    scoreBreakdown: dict[str, float]
+
+
 class DecisionSummary(BaseModel):
+    rating: Rating
     supportReasons: list[str]
     risks: list[str]
     watchPoints: list[str]
     recommendationText: str
     finalScore: float
     scoreBreakdown: dict[str, float]
+    researchReport: EquityResearchReport
 
 
 class DataSourceStatus(BaseModel):
     name: str
     status: Literal["ok", "degraded", "failed", "planned"]
     message: str
+
+
+class ChipDataGap(BaseModel):
+    code: str
+    message: str
+
+
+class InstitutionalData(BaseModel):
+    symbol: str = ""
+    asOfDate: Optional[str] = None
+    foreignNetBuy: Optional[int] = None
+    investmentTrustNetBuy: Optional[int] = None
+    dealerNetBuy: Optional[int] = None
+    institutionalNetBuyTotal: Optional[int] = None
+    source: str = "官方三大法人資料"
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
+
+
+class MarginData(BaseModel):
+    symbol: str = ""
+    asOfDate: Optional[str] = None
+    marginBalance: Optional[int] = None
+    marginChange: Optional[int] = None
+    shortBalance: Optional[int] = None
+    shortChange: Optional[int] = None
+    marginUtilizationRate: Optional[float] = None
+    shortUtilizationRate: Optional[float] = None
+    source: str = "官方融資融券資料"
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
+
+
+class ChipData(BaseModel):
+    institutional: InstitutionalData = Field(default_factory=InstitutionalData)
+    margin: MarginData = Field(default_factory=MarginData)
+    dataGaps: list[ChipDataGap] = Field(default_factory=list)
 
 
 class AnalyzeResponse(BaseModel):
@@ -98,5 +153,6 @@ class AnalyzeResponse(BaseModel):
     debate: list[DebateMessage] = Field(default_factory=list)
     decision: DecisionSummary
     sources: list[DataSourceStatus]
+    chipData: ChipData = Field(default_factory=ChipData)
     reportMarkdown: str
     disclaimer: str

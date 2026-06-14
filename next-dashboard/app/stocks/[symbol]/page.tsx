@@ -8,5 +8,9 @@ type PageProps = {
 
 export default async function StockAnalysisPage({ params }: PageProps) {
   const { symbol } = await params;
-  return <StockAnalysisClient symbol={symbol} />;
+  return (
+    <div className="w-full max-w-none">
+      <StockAnalysisClient symbol={symbol} />
+    </div>
+  );
 }
