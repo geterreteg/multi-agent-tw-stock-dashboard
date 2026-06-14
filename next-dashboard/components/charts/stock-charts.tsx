@@ -45,14 +45,14 @@ export function StockCharts({ data, summary }: { data: AnalyzeResponse; summary?
   const scenario = useMemo(() => buildTechnicalScenario(data), [data]);
 
   return (
-    <div className="grid gap-5">
-      <section className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1.45fr)_minmax(280px,.95fr)]">
-        <div className="grid gap-5">
+    <div className="grid gap-4">
+      <section className="grid items-start gap-4 xl:grid-cols-[260px_minmax(0,1.45fr)_minmax(280px,.95fr)]">
+        <div className="grid gap-4">
           {summary}
-          <MovingAveragePanel data={data} height={220} />
+          <MovingAveragePanel data={data} height={200} />
         </div>
-        <PriceChartPanel data={data} chartMode={chartMode} setChartMode={setChartMode} height={390} />
-        <VolumePanel data={data} height={390} />
+        <PriceChartPanel data={data} chartMode={chartMode} setChartMode={setChartMode} height={320} />
+        <VolumePanel data={data} height={320} />
       </section>
       <TechnicalScenarioPanel scenario={scenario} />
     </div>
@@ -158,7 +158,7 @@ function ChartPanel({
             : "border-[#e4dccf] bg-white"
       }`}
     >
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className={featured ? "text-lg font-semibold text-[#2b2925]" : "text-base font-semibold text-[#2b2925]"}>{title}</h2>
           <p className="mt-2 text-xs leading-5 text-[#746b60]">{description}</p>
@@ -371,7 +371,7 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
 
   if (chart.points.length === 0) {
     return (
-      <div className="flex min-h-[370px] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-6 text-amber-800">
+      <div className="flex min-h-[310px] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-6 text-amber-800">
         K 線資料暫無。後端需提供 open、high、low、close 後才能顯示 K 線圖。
       </div>
     );
@@ -382,8 +382,8 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
   const hitWidth = Math.max(candleWidth + 3, stepWidth);
 
   return (
-    <div className="relative min-h-[370px] overflow-hidden rounded-2xl border border-[#eee7dd] bg-[#fffdf9]">
-      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[390px] w-full" role="img" aria-label="K 線圖">
+    <div className="relative min-h-[310px] overflow-hidden rounded-2xl border border-[#eee7dd] bg-[#fffdf9]">
+      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[320px] w-full" role="img" aria-label="K 線圖">
         <rect width={chart.width} height={chart.height} fill="transparent" />
         {chart.yTicks.map((tick) => (
           <g key={tick.value}>
