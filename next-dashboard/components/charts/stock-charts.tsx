@@ -51,8 +51,8 @@ export function StockCharts({ data, summary }: { data: AnalyzeResponse; summary?
           {summary}
           <MovingAveragePanel data={data} height={200} />
         </div>
-        <PriceChartPanel data={data} chartMode={chartMode} setChartMode={setChartMode} height={320} />
-        <VolumePanel data={data} height={320} />
+        <PriceChartPanel data={data} chartMode={chartMode} setChartMode={setChartMode} height={525} />
+        <VolumePanel data={data} height={590} />
       </section>
       <TechnicalScenarioPanel scenario={scenario} />
     </div>
@@ -371,7 +371,7 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
 
   if (chart.points.length === 0) {
     return (
-      <div className="flex min-h-[310px] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-6 text-amber-800">
+      <div className="flex min-h-[515px] items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-sm leading-6 text-amber-800">
         K 線資料暫無。後端需提供 open、high、low、close 後才能顯示 K 線圖。
       </div>
     );
@@ -382,8 +382,8 @@ function CandlestickChart({ data }: { data: AnalyzeResponse["charts"]["price"] }
   const hitWidth = Math.max(candleWidth + 3, stepWidth);
 
   return (
-    <div className="relative min-h-[310px] overflow-hidden rounded-2xl border border-[#eee7dd] bg-[#fffdf9]">
-      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[320px] w-full" role="img" aria-label="K 線圖">
+    <div className="relative min-h-[515px] overflow-hidden rounded-2xl border border-[#eee7dd] bg-[#fffdf9]">
+      <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-[525px] w-full" role="img" aria-label="K 線圖">
         <rect width={chart.width} height={chart.height} fill="transparent" />
         {chart.yTicks.map((tick) => (
           <g key={tick.value}>
