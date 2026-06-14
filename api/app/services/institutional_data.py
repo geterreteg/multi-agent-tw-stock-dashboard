@@ -61,8 +61,15 @@ def fetch_twse_institutional_data(symbol: str, query_date: str | None) -> dict[s
     try:
         payload = request_json(TWSE_INSTITUTIONAL_URL, params=params, referer="https://www.twse.com.tw/zh/trading/foreign/t86.html")
     except Exception as exc:
-        logger.info("institutional_source failed source=%s symbol=%s error=%s", source, symbol, type(exc).__name__)
-        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{type(exc).__name__}")])
+        error_type = type(exc).__name__
+        logger.info(
+            "institutional_source failed source=%s symbol=%s error_type=%s error_message=%s",
+            source,
+            symbol,
+            error_type,
+            short_error_message(exc),
+        )
+        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{error_type}", error_type)])
 
     if str(payload.get("stat", "")).upper() != "OK":
         return empty_result(symbol, source, [gap("source_unavailable", f"{source} 回傳狀態非 OK")])
@@ -103,8 +110,15 @@ def fetch_tpex_institutional_data(symbol: str, query_date: str | None) -> dict[s
             referer="https://www.tpex.org.tw/zh-tw/mainboard/trading/major-institutional/detail/day.html",
         )
     except Exception as exc:
-        logger.info("institutional_source failed source=%s symbol=%s error=%s", source, symbol, type(exc).__name__)
-        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{type(exc).__name__}")])
+        error_type = type(exc).__name__
+        logger.info(
+            "institutional_source failed source=%s symbol=%s error_type=%s error_message=%s",
+            source,
+            symbol,
+            error_type,
+            short_error_message(exc),
+        )
+        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{error_type}", error_type)])
 
     tables = payload.get("tables") or []
     table = tables[0] if tables else {}
@@ -166,8 +180,12 @@ def empty_result(symbol: str, source: str, data_gaps: list[dict[str, str]] | Non
     }
 
 
-def gap(code: str, message: str) -> dict[str, str]:
-    return {"code": code, "message": message}
+def gap(code: str, message: str, error_type: str | None = None) -> dict[str, str]:
+    return {"code": code, "message": message, "errorType": error_type or code}
+
+
+def short_error_message(exc: Exception) -> str:
+    return " ".join(str(exc).split())[:240]
 
 
 def add_missing_value_gaps(result: dict[str, Any], fields: list[str], source: str) -> None:

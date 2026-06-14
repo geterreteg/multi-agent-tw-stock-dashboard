@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -25,3 +27,8 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
+
+if os.getenv("ENABLE_DEBUG_ENDPOINTS") == "true":
+    from app.routers import debug
+
+    app.include_router(debug.router, prefix="/api", tags=["debug"])

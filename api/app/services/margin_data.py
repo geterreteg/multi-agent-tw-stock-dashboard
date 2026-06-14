@@ -55,8 +55,15 @@ def fetch_twse_margin_data(symbol: str) -> dict[str, Any]:
     try:
         rows = request_json_list(TWSE_MARGIN_URL, referer="https://www.twse.com.tw/zh/trading/margin/mi-margn.html")
     except Exception as exc:
-        logger.info("margin_source failed source=%s symbol=%s error=%s", source, symbol, type(exc).__name__)
-        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{type(exc).__name__}")])
+        error_type = type(exc).__name__
+        logger.info(
+            "margin_source failed source=%s symbol=%s error_type=%s error_message=%s",
+            source,
+            symbol,
+            error_type,
+            short_error_message(exc),
+        )
+        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{error_type}", error_type)])
 
     row = find_dict_row(rows, "股票代號", symbol)
     if row is None:
@@ -87,8 +94,15 @@ def fetch_tpex_margin_data(symbol: str) -> dict[str, Any]:
     try:
         rows = request_json_list(TPEX_MARGIN_URL, referer="https://www.tpex.org.tw/zh-tw/mainboard/trading/margin-trading/balance.html")
     except Exception as exc:
-        logger.info("margin_source failed source=%s symbol=%s error=%s", source, symbol, type(exc).__name__)
-        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{type(exc).__name__}")])
+        error_type = type(exc).__name__
+        logger.info(
+            "margin_source failed source=%s symbol=%s error_type=%s error_message=%s",
+            source,
+            symbol,
+            error_type,
+            short_error_message(exc),
+        )
+        return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{error_type}", error_type)])
 
     row = find_dict_row(rows, "SecuritiesCompanyCode", symbol)
     if row is None:
@@ -157,8 +171,12 @@ def empty_result(symbol: str, source: str, data_gaps: list[dict[str, str]] | Non
     }
 
 
-def gap(code: str, message: str) -> dict[str, str]:
-    return {"code": code, "message": message}
+def gap(code: str, message: str, error_type: str | None = None) -> dict[str, str]:
+    return {"code": code, "message": message, "errorType": error_type or code}
+
+
+def short_error_message(exc: Exception) -> str:
+    return " ".join(str(exc).split())[:240]
 
 
 def add_missing_value_gaps(result: dict[str, Any], fields: list[str], source: str) -> None:
