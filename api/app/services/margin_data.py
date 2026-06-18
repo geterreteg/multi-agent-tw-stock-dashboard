@@ -7,9 +7,11 @@ from typing import Any, Optional
 
 import requests
 
+from app.services.chip_data_status import apply_data_status, has_usable_data, trading_day_candidates
+
 logger = logging.getLogger(__name__)
 
-TWSE_MARGIN_URL = "https://openapi.twse.com.tw/v1/exchangeReport/MI_MARGN"
+TWSE_MARGIN_URL = "https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN"
 TPEX_MARGIN_URL = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_margin_balance"
 OFFICIAL_TIMEOUT_SECONDS = 10
 OFFICIAL_HEADERS = {
@@ -24,36 +26,64 @@ OFFICIAL_HEADERS = {
 def get_margin_data(symbol: str, market: str | None = None, date: str | None = None) -> dict[str, Any]:
     stock_id = normalize_symbol(symbol)
     market_key = normalize_market(market)
+    target_date = parse_query_date(date)
 
     if market_key == "TWSE":
-        return fetch_twse_margin_data(stock_id)
+        return get_twse_margin_with_fallback(stock_id, target_date)
     if market_key == "TPEX":
-        return fetch_tpex_margin_data(stock_id)
+        return get_tpex_latest_margin(stock_id, target_date)
     if market_key is not None:
         return empty_result(stock_id, "官方融資融券資料", [gap("invalid_market", f"不支援的市場別：{market}")])
 
-    twse_result = fetch_twse_margin_data(stock_id)
-    if not twse_result["dataGaps"]:
+    twse_result = get_twse_margin_with_fallback(stock_id, target_date)
+    if twse_result["status"] != "missing":
         return twse_result
 
-    tpex_result = fetch_tpex_margin_data(stock_id)
-    if not tpex_result["dataGaps"]:
+    tpex_result = get_tpex_latest_margin(stock_id, target_date)
+    if tpex_result["status"] != "missing":
         return tpex_result
 
     return empty_result(
         stock_id,
         "官方融資融券資料",
-        [
-            *twse_result["dataGaps"],
-            *tpex_result["dataGaps"],
-        ],
+        [gap("missing_recent_trading_days", "最近 5 個候選交易日皆無可用融資融券資料")],
     )
 
 
-def fetch_twse_margin_data(symbol: str) -> dict[str, Any]:
+def get_twse_margin_with_fallback(symbol: str, target_date: date) -> dict[str, Any]:
+    for candidate in trading_day_candidates(target_date):
+        result = fetch_twse_margin_data(symbol, candidate.isoformat())
+        if has_usable_data(result):
+            return apply_data_status(result, target_date)
+    return empty_result(
+        symbol,
+        "TWSE 融資融券餘額",
+        [gap("missing_recent_trading_days", "最近 5 個候選交易日皆無可用 TWSE 融資融券資料")],
+    )
+
+
+def get_tpex_latest_margin(symbol: str, target_date: date) -> dict[str, Any]:
+    result = fetch_tpex_margin_data(symbol)
+    candidate_dates = {candidate.isoformat() for candidate in trading_day_candidates(target_date)}
+    data_date = result.get("dataDate") or result.get("asOfDate")
+    if has_usable_data(result) and data_date in candidate_dates:
+        return apply_data_status(result, target_date)
+    return empty_result(
+        symbol,
+        "TPEx 融資融券餘額",
+        [gap("missing_recent_trading_days", "最近 5 個候選交易日皆無可用 TPEx 融資融券資料")],
+    )
+
+
+def fetch_twse_margin_data(symbol: str, query_date: str) -> dict[str, Any]:
     source = "TWSE 融資融券餘額"
+    params = {"date": parse_query_date(query_date).strftime("%Y%m%d"), "selectType": "ALL", "response": "json"}
     try:
-        rows = request_json_list(TWSE_MARGIN_URL, referer="https://www.twse.com.tw/zh/trading/margin/mi-margn.html")
+        payload = request_json(
+            TWSE_MARGIN_URL,
+            params=params,
+            referer="https://www.twse.com.tw/zh/trading/margin/mi-margn.html",
+        )
     except Exception as exc:
         error_type = type(exc).__name__
         logger.info(
@@ -65,24 +95,26 @@ def fetch_twse_margin_data(symbol: str) -> dict[str, Any]:
         )
         return empty_result(symbol, source, [gap("source_unavailable", f"{source} 讀取失敗：{error_type}", error_type)])
 
-    row = find_dict_row(rows, "股票代號", symbol)
+    _, row = find_twse_stock_row(payload.get("tables") or [], symbol)
     if row is None:
         return empty_result(symbol, source, [gap("symbol_not_found", f"{source} 找不到股票代號 {symbol}")])
 
-    margin_balance = parse_int(row.get("融資今日餘額"))
-    previous_margin = parse_int(row.get("融資前日餘額"))
-    short_balance = parse_int(row.get("融券今日餘額"))
-    previous_short = parse_int(row.get("融券前日餘額"))
+    margin_balance = parse_int(get_list_value(row, 6))
+    previous_margin = parse_int(get_list_value(row, 5))
+    short_balance = parse_int(get_list_value(row, 12))
+    previous_short = parse_int(get_list_value(row, 11))
 
     result = empty_result(symbol, source)
     result.update(
         {
+            "asOfDate": normalize_output_date(payload.get("date")),
+            "dataDate": normalize_output_date(payload.get("date")),
             "marginBalance": margin_balance,
             "marginChange": diff_or_none(margin_balance, previous_margin),
             "shortBalance": short_balance,
             "shortChange": diff_or_none(short_balance, previous_short),
-            "marginUtilizationRate": utilization_rate(margin_balance, parse_int(row.get("融資限額"))),
-            "shortUtilizationRate": utilization_rate(short_balance, parse_int(row.get("融券限額"))),
+            "marginUtilizationRate": utilization_rate(margin_balance, parse_int(get_list_value(row, 7))),
+            "shortUtilizationRate": utilization_rate(short_balance, parse_int(get_list_value(row, 13))),
         }
     )
     add_missing_value_gaps(result, ["marginBalance", "marginChange", "shortBalance", "shortChange"], source)
@@ -117,6 +149,7 @@ def fetch_tpex_margin_data(symbol: str) -> dict[str, Any]:
     result.update(
         {
             "asOfDate": normalize_output_date(row.get("Date")),
+            "dataDate": normalize_output_date(row.get("Date")),
             "marginBalance": margin_balance,
             "marginChange": diff_or_none(margin_balance, previous_margin),
             "shortBalance": short_balance,
@@ -141,6 +174,18 @@ def request_json_list(url: str, referer: str) -> list[dict[str, Any]]:
     return [row for row in payload if isinstance(row, dict)]
 
 
+def request_json(url: str, params: dict[str, str], referer: str) -> dict[str, Any]:
+    session = requests.Session()
+    session.trust_env = False
+    headers = {**OFFICIAL_HEADERS, "Referer": referer}
+    response = session.get(url, params=params, headers=headers, timeout=OFFICIAL_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("JSON payload is not an object")
+    return payload
+
+
 def normalize_symbol(symbol: str) -> str:
     return str(symbol).strip().upper().replace(".TW", "").replace(".TWO", "")
 
@@ -160,6 +205,8 @@ def empty_result(symbol: str, source: str, data_gaps: list[dict[str, str]] | Non
     return {
         "symbol": symbol,
         "asOfDate": None,
+        "dataDate": None,
+        "status": "missing",
         "marginBalance": None,
         "marginChange": None,
         "shortBalance": None,
@@ -190,6 +237,32 @@ def find_dict_row(rows: list[dict[str, Any]], symbol_key: str, symbol: str) -> O
         if normalize_symbol(row.get(symbol_key, "")) == symbol:
             return row
     return None
+
+
+def find_twse_stock_row(tables: list[Any], symbol: str) -> tuple[list[Any], Optional[list[Any]]]:
+    symbol_fields = ("代號", "股票代號", "證券代號")
+    for table in tables:
+        if not isinstance(table, dict):
+            continue
+        fields = table.get("fields") or []
+        symbol_field = next((field for field in symbol_fields if field in fields), None)
+        if symbol_field is None:
+            continue
+        row = find_list_row(table.get("data") or [], fields.index(symbol_field), symbol)
+        if row is not None:
+            return fields, row
+    return [], None
+
+
+def find_list_row(rows: list[Any], symbol_index: int, symbol: str) -> Optional[list[Any]]:
+    for row in rows:
+        if isinstance(row, list) and normalize_symbol(get_list_value(row, symbol_index)) == symbol:
+            return row
+    return None
+
+
+def get_list_value(row: list[Any], index: int) -> Any:
+    return row[index] if index < len(row) else None
 
 
 def parse_int(value: Any) -> Optional[int]:

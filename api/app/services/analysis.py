@@ -67,6 +67,12 @@ class StockContext:
     finmind_errors: list[str] = field(default_factory=list)
     finmind_token_mode: str = ""
     chip_data: dict = field(default_factory=dict)
+    institutional_status: str = "missing"
+    institutional_data_date: Optional[str] = None
+    institutional_source: str = "官方三大法人資料"
+    margin_status: str = "missing"
+    margin_data_date: Optional[str] = None
+    margin_source: str = "官方融資融券資料"
 
 
 def build_context(symbol: str, period: str = "6mo") -> StockContext:
@@ -77,6 +83,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
     finmind = fetch_finmind_bundle(stock_id, token, token_mode)
     market = infer_market_from_price_status(price_status)
     chip_data = build_chip_data(stock_id, market)
+    chip_metrics = chip_metrics_from_data(chip_data)
 
     return StockContext(
         stock_id=stock_id,
@@ -93,15 +100,21 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
         revenue_growth=safe_float(finmind["revenue_growth"]),
         eps=safe_float(finmind["eps"]),
         pe_ratio=safe_float(finmind["pe_ratio"]),
-        foreign_buy=safe_float(finmind["foreign_buy"]),
-        institutional_net_buy=safe_float(finmind["institutional_net_buy"]),
-        margin_balance_change=safe_float(finmind["margin_balance_change"]),
-        short_balance_change=safe_float(finmind["short_balance_change"]),
+        foreign_buy=safe_float(chip_metrics["foreign_buy"]),
+        institutional_net_buy=safe_float(chip_metrics["institutional_net_buy"]),
+        margin_balance_change=safe_float(chip_metrics["margin_balance_change"]),
+        short_balance_change=safe_float(chip_metrics["short_balance_change"]),
         dividend_summary=str(finmind["dividend_summary"]),
         source_status=[price_status, finmind["status"]],
         finmind_errors=list(finmind["errors"]),
         finmind_token_mode=token_mode,
         chip_data=chip_data,
+        institutional_status=str(chip_metrics["institutional_status"]),
+        institutional_data_date=chip_metrics["institutional_data_date"],
+        institutional_source=str(chip_metrics["institutional_source"]),
+        margin_status=str(chip_metrics["margin_status"]),
+        margin_data_date=chip_metrics["margin_data_date"],
+        margin_source=str(chip_metrics["margin_source"]),
     )
 
 
@@ -203,6 +216,8 @@ def build_chip_data(stock_id: str, market: Optional[str]) -> dict:
         institutional = {
             "symbol": stock_id,
             "asOfDate": None,
+            "dataDate": None,
+            "status": "missing",
             "foreignNetBuy": None,
             "investmentTrustNetBuy": None,
             "dealerNetBuy": None,
@@ -217,6 +232,8 @@ def build_chip_data(stock_id: str, market: Optional[str]) -> dict:
         margin = {
             "symbol": stock_id,
             "asOfDate": None,
+            "dataDate": None,
+            "status": "missing",
             "marginBalance": None,
             "marginChange": None,
             "shortBalance": None,
@@ -228,14 +245,48 @@ def build_chip_data(stock_id: str, market: Optional[str]) -> dict:
         }
 
     return {
+        "overallStatus": chip_overall_status(institutional, margin),
         "institutional": institutional,
         "margin": margin,
         "dataGaps": [*(institutional.get("dataGaps") or []), *(margin.get("dataGaps") or [])],
     }
 
 
+def chip_overall_status(institutional: dict, margin: dict) -> str:
+    statuses = {institutional.get("status", "missing"), margin.get("status", "missing")}
+    if statuses == {"current"}:
+        return "current"
+    if statuses == {"missing"}:
+        return "missing"
+    if "missing" in statuses:
+        return "partial"
+    if "latest_available" in statuses:
+        return "latest_available"
+    return "missing"
+
+
+def chip_metrics_from_data(chip_data: dict) -> dict:
+    institutional = chip_data.get("institutional") or {}
+    margin = chip_data.get("margin") or {}
+    institutional_available = institutional.get("status") in {"current", "latest_available"}
+    margin_available = margin.get("status") in {"current", "latest_available"}
+    return {
+        "foreign_buy": institutional.get("foreignNetBuy") if institutional_available else None,
+        "institutional_net_buy": institutional.get("institutionalNetBuyTotal") if institutional_available else None,
+        "margin_balance_change": margin.get("marginChange") if margin_available else None,
+        "short_balance_change": margin.get("shortChange") if margin_available else None,
+        "institutional_status": institutional.get("status", "missing"),
+        "institutional_data_date": institutional.get("dataDate") or institutional.get("asOfDate"),
+        "institutional_source": institutional.get("source", "官方三大法人資料"),
+        "margin_status": margin.get("status", "missing"),
+        "margin_data_date": margin.get("dataDate") or margin.get("asOfDate"),
+        "margin_source": margin.get("source", "官方融資融券資料"),
+    }
+
+
 def chip_data_to_model(chip_data: dict) -> ChipData:
     return ChipData(
+        overallStatus=chip_data.get("overallStatus", "missing"),
         institutional=InstitutionalData(**(chip_data.get("institutional") or {})),
         margin=MarginData(**(chip_data.get("margin") or {})),
         dataGaps=chip_data.get("dataGaps") or [],

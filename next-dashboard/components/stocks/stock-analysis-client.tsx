@@ -474,10 +474,23 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
       icon: AlertTriangle,
       groups: [
         {
+          title: "籌碼整體狀態",
+          items: [`資料狀態：${formatChipStatus(data.chipData?.overallStatus)}`],
+          tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "default",
+          badges: [{
+            label: formatChipStatus(data.chipData?.overallStatus),
+            tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "ok",
+          }],
+        },
+        {
           title: "三大法人買賣超",
-          items: [`資料來源：${formatOfficialText(institutional?.source)}`, `資料日期：${formatOfficialDate(institutional?.asOfDate)}`],
-          tone: institutional?.dataGaps?.length ? "gap" : "default",
-          badges: [{ label: institutional?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: institutional?.dataGaps?.length ? "gap" : "ok" }],
+          items: [
+            `資料來源：${formatOfficialText(institutional?.source)}`,
+            `資料狀態：${formatChipStatus(institutional?.status)}`,
+            `資料日期：${formatOfficialDate(institutional?.dataDate ?? institutional?.asOfDate)}`,
+          ],
+          tone: institutional?.status === "missing" ? "gap" : "default",
+          badges: [{ label: formatChipStatus(institutional?.status), tone: institutional?.status === "missing" ? "gap" : "ok" }],
           metrics: [
             { label: "外資買賣超", value: formatOfficialInteger(institutional?.foreignNetBuy, "股"), tone: officialNumberTone(institutional?.foreignNetBuy) },
             { label: "投信買賣超", value: formatOfficialInteger(institutional?.investmentTrustNetBuy, "股"), tone: officialNumberTone(institutional?.investmentTrustNetBuy) },
@@ -487,9 +500,13 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
         },
         {
           title: "融資融券",
-          items: [`資料來源：${formatOfficialText(margin?.source)}`, `資料日期：${formatOfficialDate(margin?.asOfDate)}`],
-          tone: margin?.dataGaps?.length ? "gap" : "default",
-          badges: [{ label: margin?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: margin?.dataGaps?.length ? "gap" : "ok" }],
+          items: [
+            `資料來源：${formatOfficialText(margin?.source)}`,
+            `資料狀態：${formatChipStatus(margin?.status)}`,
+            `資料日期：${formatOfficialDate(margin?.dataDate ?? margin?.asOfDate)}`,
+          ],
+          tone: margin?.status === "missing" ? "gap" : "default",
+          badges: [{ label: formatChipStatus(margin?.status), tone: margin?.status === "missing" ? "gap" : "ok" }],
           metrics: [
             { label: "融資餘額", value: formatOfficialInteger(margin?.marginBalance, "張") },
             { label: "融資增減", value: formatOfficialInteger(margin?.marginChange, "張"), tone: officialNumberTone(margin?.marginChange) },
@@ -1164,6 +1181,13 @@ function formatOfficialText(value: string | null | undefined) {
 
 function formatOfficialDate(value: string | null | undefined) {
   return value && value.trim().length > 0 ? value : "日期未提供";
+}
+
+function formatChipStatus(value: "current" | "latest_available" | "partial" | "missing" | undefined) {
+  if (value === "current") return "當日官方資料";
+  if (value === "latest_available") return "最近可得官方資料";
+  if (value === "partial") return "部分官方資料";
+  return "官方資料缺失";
 }
 
 function formatOfficialInteger(value: number | null | undefined, unit = "") {

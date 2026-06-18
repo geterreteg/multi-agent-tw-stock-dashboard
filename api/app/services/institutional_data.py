@@ -7,6 +7,8 @@ from typing import Any, Optional
 
 import requests
 
+from app.services.chip_data_status import apply_data_status, has_usable_data, trading_day_candidates
+
 logger = logging.getLogger(__name__)
 
 TWSE_INSTITUTIONAL_URL = "https://www.twse.com.tw/rwd/zh/fund/T86"
@@ -24,29 +26,26 @@ OFFICIAL_HEADERS = {
 def get_institutional_data(symbol: str, market: str | None = None, date: str | None = None) -> dict[str, Any]:
     stock_id = normalize_symbol(symbol)
     market_key = normalize_market(market)
+    target_date = parse_query_date(date)
 
-    if market_key == "TWSE":
-        return fetch_twse_institutional_data(stock_id, date)
-    if market_key == "TPEX":
-        return fetch_tpex_institutional_data(stock_id, date)
     if market_key is not None:
-        return empty_result(stock_id, "官方三大法人資料", [gap("invalid_market", f"不支援的市場別：{market}")])
+        if market_key not in {"TWSE", "TPEX"}:
+            return empty_result(stock_id, "官方三大法人資料", [gap("invalid_market", f"不支援的市場別：{market}")])
+        fetchers = [fetch_twse_institutional_data if market_key == "TWSE" else fetch_tpex_institutional_data]
+    else:
+        fetchers = [fetch_twse_institutional_data, fetch_tpex_institutional_data]
 
-    twse_result = fetch_twse_institutional_data(stock_id, date)
-    if not twse_result["dataGaps"]:
-        return twse_result
-
-    tpex_result = fetch_tpex_institutional_data(stock_id, date)
-    if not tpex_result["dataGaps"]:
-        return tpex_result
+    for candidate in trading_day_candidates(target_date):
+        query_date = candidate.isoformat()
+        for fetcher in fetchers:
+            result = fetcher(stock_id, query_date)
+            if has_usable_data(result):
+                return apply_data_status(result, target_date)
 
     return empty_result(
         stock_id,
         "官方三大法人資料",
-        [
-            *twse_result["dataGaps"],
-            *tpex_result["dataGaps"],
-        ],
+        [gap("missing_recent_trading_days", "最近 5 個候選交易日皆無可用三大法人資料")],
     )
 
 
@@ -84,6 +83,7 @@ def fetch_twse_institutional_data(symbol: str, query_date: str | None) -> dict[s
     result.update(
         {
             "asOfDate": normalize_output_date(payload.get("date")),
+            "dataDate": normalize_output_date(payload.get("date")),
             "foreignNetBuy": parse_int(values.get("外陸資買賣超股數(不含外資自營商)")),
             "investmentTrustNetBuy": parse_int(values.get("投信買賣超股數")),
             "dealerNetBuy": parse_int(values.get("自營商買賣超股數")),
@@ -130,6 +130,7 @@ def fetch_tpex_institutional_data(symbol: str, query_date: str | None) -> dict[s
     result.update(
         {
             "asOfDate": normalize_output_date(table.get("date")),
+            "dataDate": normalize_output_date(table.get("date")),
             "foreignNetBuy": parse_int(get_list_value(row, 10)),
             "investmentTrustNetBuy": parse_int(get_list_value(row, 13)),
             "dealerNetBuy": parse_int(get_list_value(row, 22)),
@@ -171,6 +172,8 @@ def empty_result(symbol: str, source: str, data_gaps: list[dict[str, str]] | Non
     return {
         "symbol": symbol,
         "asOfDate": None,
+        "dataDate": None,
+        "status": "missing",
         "foreignNetBuy": None,
         "investmentTrustNetBuy": None,
         "dealerNetBuy": None,

@@ -114,6 +114,8 @@ class ChipDataGap(BaseModel):
 class InstitutionalData(BaseModel):
     symbol: str = ""
     asOfDate: Optional[str] = None
+    dataDate: Optional[str] = None
+    status: Literal["current", "latest_available", "missing"] = "missing"
     foreignNetBuy: Optional[int] = None
     investmentTrustNetBuy: Optional[int] = None
     dealerNetBuy: Optional[int] = None
@@ -125,6 +127,8 @@ class InstitutionalData(BaseModel):
 class MarginData(BaseModel):
     symbol: str = ""
     asOfDate: Optional[str] = None
+    dataDate: Optional[str] = None
+    status: Literal["current", "latest_available", "missing"] = "missing"
     marginBalance: Optional[int] = None
     marginChange: Optional[int] = None
     shortBalance: Optional[int] = None
@@ -136,6 +140,7 @@ class MarginData(BaseModel):
 
 
 class ChipData(BaseModel):
+    overallStatus: Literal["current", "latest_available", "partial", "missing"] = "missing"
     institutional: InstitutionalData = Field(default_factory=InstitutionalData)
     margin: MarginData = Field(default_factory=MarginData)
     dataGaps: list[ChipDataGap] = Field(default_factory=list)

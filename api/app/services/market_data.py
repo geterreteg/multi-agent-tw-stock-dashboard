@@ -25,6 +25,10 @@ TWSE_SOURCE = "TWSE 官方日 K"
 TPEX_SOURCE = "TPEx 官方日 K"
 FINMIND_SOURCE = "FinMind"
 FINMIND_API_URL = "https://api.finmindtrade.com/api/v4/data"
+LEGACY_FINMIND_CHIP_DATASETS = (
+    "TaiwanStockInstitutionalInvestorsBuySell",
+    "TaiwanStockMarginPurchaseShortSale",
+)
 TWSE_STOCK_DAY_URL = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
 TPEX_STOCK_DAY_URL = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
 FINMIND_TOKEN_CONFIGURED_MESSAGE = "FinMind API 權限已由後端環境設定"
@@ -567,8 +571,6 @@ def fetch_finmind_bundle(stock_id: str, token: str, token_mode: str) -> dict[str
         "month_revenue": ("TaiwanStockMonthRevenue", 1095),
         "financials": ("TaiwanStockFinancialStatements", 1095),
         "per": ("TaiwanStockPER", 365),
-        "institutional": ("TaiwanStockInstitutionalInvestorsBuySell", 180),
-        "margin": ("TaiwanStockMarginPurchaseShortSale", 180),
         "dividend": ("TaiwanStockDividend", 3650),
     }
     frames: dict[str, pd.DataFrame] = {}
@@ -592,8 +594,6 @@ def fetch_finmind_bundle(stock_id: str, token: str, token_mode: str) -> dict[str
     latest_revenue, revenue_growth = summarize_revenue(frames["month_revenue"])
     eps = summarize_financials(frames["financials"])
     pe_ratio = latest_numeric(frames["per"], ["PER", "pe_ratio", "PE", "P_E_Ratio"])
-    foreign_buy, institutional_net = summarize_institutional(frames["institutional"])
-    margin_change, short_change = summarize_margin(frames["margin"])
     dividend_summary = summarize_dividend(frames["dividend"])
 
     ok_count = sum(1 for frame in frames.values() if not frame.empty)
@@ -615,10 +615,10 @@ def fetch_finmind_bundle(stock_id: str, token: str, token_mode: str) -> dict[str
         "revenue_growth": revenue_growth,
         "eps": eps,
         "pe_ratio": pe_ratio,
-        "foreign_buy": foreign_buy,
-        "institutional_net_buy": institutional_net,
-        "margin_balance_change": margin_change,
-        "short_balance_change": short_change,
+        "foreign_buy": None,
+        "institutional_net_buy": None,
+        "margin_balance_change": None,
+        "short_balance_change": None,
         "dividend_summary": dividend_summary,
         "errors": errors,
         "status": status,

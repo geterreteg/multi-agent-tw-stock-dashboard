@@ -147,7 +147,7 @@ def build_mock_analysis(symbol: str, period: str) -> AnalyzeResponse:
         variantView=["若接回真實資料後營收、EPS 或法人資料不支持，評級應下修。"],
         recommendation="Neutral / 中性",
         confidenceScore=35,
-        dataGaps=["真實 yfinance 股價資料", "真實 FinMind 基本面資料", "真實 FinMind 籌碼資料"],
+        dataGaps=["真實 yfinance 股價資料", "真實 FinMind 基本面資料", "真實籌碼資料"],
         scoreBreakdown={
             "financialOrPricePerformance": 16,
             "growth": 12,
