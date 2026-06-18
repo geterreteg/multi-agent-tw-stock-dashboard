@@ -64,6 +64,7 @@ type ResearchTab = {
   description: string;
   icon: LucideIcon;
   groups: ResearchTabGroup[];
+  badges?: ResearchTabBadge[];
   highlights?: ResearchTabHighlight[];
   showCharts?: boolean;
 };
@@ -472,16 +473,11 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
       label: "籌碼與風險",
       description: "呈現官方三大法人、融資融券、風險與反方觀點；官方資料不可用時列為資料缺口。",
       icon: AlertTriangle,
+      badges: [{
+        label: formatChipStatus(data.chipData?.overallStatus),
+        tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "ok",
+      }],
       groups: [
-        {
-          title: "籌碼整體狀態",
-          items: [`資料狀態：${formatChipStatus(data.chipData?.overallStatus)}`],
-          tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "default",
-          badges: [{
-            label: formatChipStatus(data.chipData?.overallStatus),
-            tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "ok",
-          }],
-        },
         {
           title: "三大法人買賣超",
           items: [
@@ -610,9 +606,20 @@ function TabSummaryPanel({ panel, icon: Icon, extraGroups = [] }: { panel: Resea
   return (
     <div className="grid self-start gap-4">
       <aside className="rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-5 shadow-[0_12px_30px_rgba(57,49,37,.045)]">
-        <div className="flex items-center gap-2 text-[#7d5d2e]">
-          <Icon className="h-5 w-5" />
-          <p className="text-sm font-semibold">{panel.label}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[#7d5d2e]">
+          <div className="flex items-center gap-2">
+            <Icon className="h-5 w-5" />
+            <p className="text-sm font-semibold">{panel.label}</p>
+          </div>
+          {panel.badges && panel.badges.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {panel.badges.map((badge) => (
+                <Badge key={`${panel.id}-${badge.label}`} className={researchBadgeClass(badge.tone)}>
+                  {badge.label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
         </div>
         <p className="mt-3 text-xs leading-6 text-[#746b60]">{panel.description}</p>
         {panel.highlights && panel.highlights.length > 0 ? (
