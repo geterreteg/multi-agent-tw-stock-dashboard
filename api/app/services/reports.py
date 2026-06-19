@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.models import AgentInsight, DebateMessage, DecisionSummary
 from app.services.market_data import FINMIND_SOURCE, YFINANCE_SOURCE, fmt_number
+from app.services.target_price import TargetPriceResult
 
 DISCLAIMER = "本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。投資人仍應自行評估風險並承擔投資結果。"
 DATA_DELAY_NOTE = "資料可能延遲或不完整，本系統不宣稱資料完全即時。"
@@ -13,6 +14,7 @@ def generate_markdown_report(
     final_rating: str,
     decision: DecisionSummary,
     debate: list[DebateMessage] | None = None,
+    target_price: TargetPriceResult | None = None,
 ) -> str:
     source_items = "\n".join(
         f"- {status.name}：{'成功' if status.ok else '降級'}，{status.message}" for status in context.source_status
@@ -36,6 +38,7 @@ def generate_markdown_report(
     watch_items = "\n".join(f"- {item}" for item in decision.watchPoints)
     finmind_errors = "\n".join(f"- {error}" for error in context.finmind_errors) or "- 無"
     research = decision.researchReport
+    target_price_section = format_target_price_section(target_price)
     research_sections = f"""## 三、Public Equity Investing 結構化研究報告
 
 ### investmentThesis：投資論點
@@ -86,9 +89,9 @@ def generate_markdown_report(
 - 融資融券資料來源：{context.margin_source}
 - 融資融券資料狀態：{context.margin_status}
 - 融資融券資料日期：{context.margin_data_date or '資料暫無'}
-- 最新收盤價：{fmt_number(context.latest_close)}
-- MA20：{fmt_number(context.ma20)}
-- MA60：{fmt_number(context.ma60)}
+- 最新收盤價：{fmt_price(context.latest_close)}
+- MA20：{fmt_price(context.ma20)}
+- MA60：{fmt_price(context.ma60)}
 - 20 日報酬率：{fmt_number(context.return_20d, suffix="%")}
 - 平均成交量：{fmt_number(context.average_volume, decimals=0)}
 - 月營收成長率：{fmt_number(context.revenue_growth, suffix="%")}
@@ -106,32 +109,37 @@ def generate_markdown_report(
 
 {research_sections}
 
-## 四、多 Agent 分析
+## 四、12M 規則式目標價與估值參考區間
+{target_price_section}
+
+## 五、多 Agent 分析
 {agent_sections}
 
-## 五、Agent 辯論室
+## 六、Agent 辯論室
 {debate_items}
 
-## 六、最終研究結論
-### 綜合評級：{final_rating}
+## 七、最終研究結論
+
+### 結論
+綜合評級：{final_rating}。本評級仍綜合技術面、基本面、籌碼、風險與資料品質；規則式目標價不單獨主導評級。
 
 finalScore：{decision.finalScore:.2f}
 
 scoreBreakdown：{decision.scoreBreakdown}
 
-#### 支持理由
+### 依據
 {support_items}
 
-#### 反方風險
+### 風險
 {risk_items}
 
-#### 觀察重點
+### 資料限制
 {watch_items}
 
 #### 投資建議與操作條件
 {decision.recommendationText}
 
-## 七、資料限制與免責聲明
+## 八、資料限制與免責聲明
 {DATA_DELAY_NOTE}
 
 {DISCLAIMER}
@@ -148,3 +156,33 @@ def fmt_pe_metric(context) -> str:
     if (context.eps is not None and context.eps < 0) or context.pe_ratio <= 0:
         return f"不適用（EPS {fmt_number(context.eps)}，PE 不具一般估值意義）"
     return fmt_number(context.pe_ratio)
+
+
+def format_target_price_section(target_price: TargetPriceResult | None) -> str:
+    if target_price is None or target_price.valuationMethod == "INSUFFICIENT_DATA":
+        limitations = target_price.limitations if target_price is not None else ["後端未提供 targetPrice 契約。"]
+        return "資料不足，暫不產生正式 12M 目標價。\n\n" + list_markdown(limitations)
+    return (
+        f"- Bear：{target_price.bearTargetPrice}\n"
+        f"- Base：{target_price.baseTargetPrice}\n"
+        f"- Bull：{target_price.bullTargetPrice}\n"
+        f"- Base 隱含空間：{target_price.impliedUpsidePct:.1f}%\n"
+        f"- 目前 PE：{format_pe(target_price.fairPERatio)}\n"
+        f"- EPS basis：{target_price.epsBasis}\n"
+        f"- PE source：{target_price.peSource}\n"
+        f"- confidence：{target_price.confidence}/65\n\n"
+        + list_markdown(target_price.assumptions)
+        + "\n\n限制：\n"
+        + list_markdown(target_price.limitations)
+    )
+
+
+def format_pe(value: float | None) -> str:
+    if value is None:
+        return "資料暫無"
+    formatted = f"{value:.2f}".rstrip("0").rstrip(".")
+    return formatted if "." in formatted else f"{formatted}.0"
+
+
+def fmt_price(value: float | None) -> str:
+    return fmt_number(value, decimals=0)

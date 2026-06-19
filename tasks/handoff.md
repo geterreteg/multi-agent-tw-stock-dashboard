@@ -1,5 +1,16 @@
 # 專案交接紀錄
 
+## 2026-06-19 Target Price 與個人工具第一版（隔離分支）
+
+- 工作分支：`codex/target-price-personal-tool-v1`；隔離 worktree：`.worktrees/codex-target-price-personal-tool-v1`。尚未 merge、push 或部署 production。
+- FastAPI 新增獨立規則式 PE Multiple engine 與 top-level `targetPrice` 契約；只接受 forward、TTM 或可驗證近四季 EPS。外部 PE 才做獨立一致性檢查，推導 PE confidence 上限較低。
+- 目標價成功時使用 `basePERatio = currentPE`、`bearPERatio = currentPE * 0.90`、`bullPERatio = currentPE * 1.10`；價格輸出為整數、upside 1 位、PE 1 至 2 位。
+- Target Price Engine 不參與既有 Agent 評分。報告改為「結論、依據、風險、資料限制」，並揭露缺少歷史 PE、同業 PE、DCF 與法人一致性預估。
+- Next.js 個股頁新增目標價摘要與估值 panel、「辯論室」及「決策筆記」tabs；筆記只存在瀏覽器 localStorage，不送後端。
+- 2330 真實資料 smoke test：rating=`Buy / 看多`，EPS basis=`SINGLE_QUARTER`，PE source=`EXTERNAL`，target price=`INSUFFICIENT_DATA`；limitations 明確說明單季 EPS 不得直接產生正式 12M 目標價。
+- 0000 資料不足 smoke test：rating=`Neutral / 中性`，target price=`INSUFFICIENT_DATA`，沒有目標價數字。
+- 驗證：FastAPI unittest 28/28、TypeScript、Next.js production build 通過；Browser DOM/互動驗證通過摘要、基本面 fallback、辯論室與決策筆記保存/恢復，console 無錯誤。Browser screenshot 因 CDP timeout 未取得，行動 viewport override 未實際套用。
+
 ## 2026-06-19 Production End-to-End 驗收完成
 
 - Vercel `multi-agent-tw-stock-dashboard-next` 於 17:36 完成 Ready production deployment，正式 URL 為 `https://multi-agent-tw-stock-dashboard-next.vercel.app`。

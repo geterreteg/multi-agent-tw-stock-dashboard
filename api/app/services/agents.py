@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable
 
 from app.models import AgentInsight, DebateMessage, DecisionSummary, EquityResearchReport, Rating
+from app.services.target_price import TargetPriceResult
 from app.services.market_data import fmt_number
 
 
@@ -16,10 +17,10 @@ def technical_agent(context) -> AgentInsight:
         available += 1
         if context.latest_close > context.ma20:
             score += 0.5
-            reasons.append(f"收盤價 {fmt_number(context.latest_close)} 高於 MA20 {fmt_number(context.ma20)}，短線價格位置偏正向。")
+            reasons.append(f"收盤價 {fmt_price(context.latest_close)} 高於 MA20 {fmt_price(context.ma20)}，短線價格位置偏正向。")
         elif context.latest_close < context.ma20:
             score -= 0.5
-            risks.append(f"收盤價 {fmt_number(context.latest_close)} 低於 MA20 {fmt_number(context.ma20)}，短線動能轉弱。")
+            risks.append(f"收盤價 {fmt_price(context.latest_close)} 低於 MA20 {fmt_price(context.ma20)}，短線動能轉弱。")
     else:
         risks.append("缺少收盤價或 MA20，短線技術判斷降級。")
 
@@ -27,10 +28,10 @@ def technical_agent(context) -> AgentInsight:
         available += 1
         if context.latest_close > context.ma60:
             score += 0.5
-            reasons.append(f"收盤價高於 MA60 {fmt_number(context.ma60)}，中期趨勢位置仍在均線上方。")
+            reasons.append(f"收盤價高於 MA60 {fmt_price(context.ma60)}，中期趨勢位置仍在均線上方。")
         elif context.latest_close < context.ma60:
             score -= 0.5
-            risks.append(f"收盤價低於 MA60 {fmt_number(context.ma60)}，中期趨勢位置偏弱。")
+            risks.append(f"收盤價低於 MA60 {fmt_price(context.ma60)}，中期趨勢位置偏弱。")
     else:
         risks.append("缺少 MA60，無法完整檢查中期趨勢。")
 
@@ -72,14 +73,14 @@ def technical_agent(context) -> AgentInsight:
         confidence=bounded_confidence(0.24 + available * 0.12 + min(abs(score), 2) * 0.08),
         summary=f"價格結構分數 {score:.2f}，依據收盤價、MA20、MA60、20 日報酬率與成交量計算。",
         narrative=(
-            f"最新收盤價 {fmt_number(context.latest_close)}，MA20 {fmt_number(context.ma20)}，MA60 {fmt_number(context.ma60)}，"
+            f"最新收盤價 {fmt_price(context.latest_close)}，MA20 {fmt_price(context.ma20)}，MA60 {fmt_price(context.ma60)}，"
             f"20 日報酬率 {fmt_number(context.return_20d, suffix='%')}，近 20 日平均成交量 "
             f"{fmt_number(context.average_volume, decimals=0)}。"
         ),
         evidence=[
-            f"最新收盤價：{fmt_number(context.latest_close)}",
-            f"MA20：{fmt_number(context.ma20)}",
-            f"MA60：{fmt_number(context.ma60)}",
+            f"最新收盤價：{fmt_price(context.latest_close)}",
+            f"MA20：{fmt_price(context.ma20)}",
+            f"MA60：{fmt_price(context.ma60)}",
             f"20 日報酬率：{fmt_number(context.return_20d, suffix='%')}",
             f"近 20 日平均成交量：{fmt_number(context.average_volume, decimals=0)}",
         ],
@@ -310,9 +311,9 @@ def build_equity_research_report(context, agents: list[AgentInsight]) -> EquityR
     gaps = collect_data_gaps(context)
     metrics = [
         f"產業分類：{context.industry or '資料暫無'}",
-        f"最新收盤價：{fmt_number(context.latest_close)}",
+        f"最新收盤價：{fmt_price(context.latest_close)}",
         f"20 日報酬率：{fmt_number(context.return_20d, suffix='%')}",
-        f"MA20 / MA60：{fmt_number(context.ma20)} / {fmt_number(context.ma60)}",
+        f"MA20 / MA60：{fmt_price(context.ma20)} / {fmt_price(context.ma60)}",
         f"近 20 日平均成交量：{fmt_number(context.average_volume, decimals=0)}",
         f"月營收成長率：{fmt_number(context.revenue_growth, suffix='%')}",
         f"EPS：{fmt_number(context.eps)}",
@@ -374,7 +375,7 @@ def build_thesis(context, total: float, recommendation: Rating) -> list[str]:
     items.append(primary_reason(context, recommendation))
     if context.latest_close is not None and context.ma20 is not None and context.ma60 is not None:
         relation = "高於" if context.latest_close > context.ma20 and context.latest_close > context.ma60 else "未同時高於"
-        items.append(f"價格面：收盤價 {fmt_number(context.latest_close)} {relation} MA20/MA60，形成主要趨勢判斷。")
+        items.append(f"價格面：收盤價 {fmt_price(context.latest_close)} {relation} MA20/MA60，形成主要趨勢判斷。")
     if context.revenue_growth is not None or context.eps is not None:
         items.append(f"基本面：月營收成長 {fmt_number(context.revenue_growth, suffix='%')}，EPS {fmt_number(context.eps)}。")
     if context.foreign_buy is not None or context.institutional_net_buy is not None:
@@ -399,7 +400,7 @@ def build_business_quality(context) -> list[str]:
 def build_financial_analysis(context) -> list[str]:
     return [
         f"價格表現：20 日報酬率 {fmt_number(context.return_20d, suffix='%')}，用於衡量短期動能或壓力。",
-        f"趨勢位置：最新收盤 {fmt_number(context.latest_close)}，MA20 {fmt_number(context.ma20)}，MA60 {fmt_number(context.ma60)}。",
+        f"趨勢位置：最新收盤 {fmt_price(context.latest_close)}，MA20 {fmt_price(context.ma20)}，MA60 {fmt_price(context.ma60)}。",
         f"財務表現：最新月營收 {fmt_number(context.latest_revenue, decimals=0)}，月營收成長 {fmt_number(context.revenue_growth, suffix='%')}，EPS {fmt_number(context.eps)}。",
         f"籌碼表現：外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}，三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}，融資餘額變化 {fmt_number(context.margin_balance_change, decimals=0)}。",
     ]
@@ -472,14 +473,14 @@ def build_recommendation_text(context, report: EquityResearchReport, final_score
     indicators = "；".join(key_observation_indicators(context))
     gaps = f" 資料缺口：{sentence_join(report.dataGaps[:3])}" if report.dataGaps else ""
     pe_note = " EPS 為負或 PE 無效，因此本益比不具一般估值意義，不能解讀為便宜。" if pe_not_meaningful(context) else ""
+    data_limits = sentence_join(report.dataGaps[:3]) if report.dataGaps else "核心資料可用，但仍可能延遲或不完整。"
     return (
-        f"核心結論：{context.stock_id} {context.stock_name} 目前建議為「{action}」，規則式評級為 {report.recommendation}，"
+        f"結論：{context.stock_id} {context.stock_name} 的規則式評級為 {report.recommendation}，"
+        f"目前觀點為「{action}」。評級綜合技術面、基本面、籌碼、風險與資料品質，"
         f"finalScore {final_score:.1f}/100，confidenceScore {report.confidenceScore}/100。{reason}{pe_note}\n"
-        f"操作策略：{strategy}\n"
-        f"轉強條件：{stronger}\n"
-        f"轉弱條件：{weaker}\n"
-        f"主要風險：{risks}\n"
-        f"關鍵觀察指標：{indicators}。{gaps}"
+        f"依據：{strategy} 轉強條件包括 {stronger}；關鍵觀察指標為 {indicators}。\n"
+        f"風險：{risks} 轉弱條件包括 {weaker}。\n"
+        f"資料限制：{data_limits}。{gaps}尚未納入歷史 PE、同業 PE、DCF 與法人一致性預估。"
         "本結論僅供課程研究與資料分析展示，不構成正式投資建議或獲利保證。"
     )
 
@@ -524,13 +525,13 @@ def strengthening_conditions(context) -> list[str]:
     if context.latest_close is None or context.ma20 is None:
         conditions.append("補齊收盤價與 MA20 後再確認短線趨勢")
     elif context.latest_close <= context.ma20:
-        conditions.append(f"收盤價重新站回 MA20 {fmt_number(context.ma20)}")
+        conditions.append(f"收盤價重新站回 MA20 {fmt_price(context.ma20)}")
     else:
         conditions.append("收盤價維持在 MA20 之上")
     if context.latest_close is None or context.ma60 is None:
         conditions.append("補齊 MA60 後再確認中期趨勢")
     elif context.latest_close <= context.ma60:
-        conditions.append(f"收盤價重新站回 MA60 {fmt_number(context.ma60)}")
+        conditions.append(f"收盤價重新站回 MA60 {fmt_price(context.ma60)}")
     else:
         conditions.append("收盤價維持在 MA60 之上")
     if context.eps is None:
@@ -557,11 +558,11 @@ def strengthening_conditions(context) -> list[str]:
 def weakening_conditions(context) -> list[str]:
     conditions: list[str] = []
     if context.latest_close is not None and context.ma20 is not None:
-        conditions.append(f"收盤價跌破或持續低於 MA20 {fmt_number(context.ma20)}")
+        conditions.append(f"收盤價跌破或持續低於 MA20 {fmt_price(context.ma20)}")
     else:
         conditions.append("價格與 MA20 資料不足，無法確認短線風險")
     if context.latest_close is not None and context.ma60 is not None:
-        conditions.append(f"收盤價跌破或持續低於 MA60 {fmt_number(context.ma60)}")
+        conditions.append(f"收盤價跌破或持續低於 MA60 {fmt_price(context.ma60)}")
     else:
         conditions.append("MA60 資料不足，無法確認中期趨勢")
     if context.revenue_growth is None:
@@ -587,9 +588,9 @@ def weakening_conditions(context) -> list[str]:
 
 def key_observation_indicators(context) -> list[str]:
     return [
-        f"收盤價 {fmt_number(context.latest_close)}",
-        f"MA20 {fmt_number(context.ma20)}",
-        f"MA60 {fmt_number(context.ma60)}",
+        f"收盤價 {fmt_price(context.latest_close)}",
+        f"MA20 {fmt_price(context.ma20)}",
+        f"MA60 {fmt_price(context.ma60)}",
         f"20 日報酬率 {fmt_number(context.return_20d, suffix='%')}",
         f"EPS {fmt_number(context.eps)}",
         f"本益比 {fmt_pe_metric(context)}",
@@ -865,6 +866,104 @@ def build_debate(agents: list[AgentInsight], rating: Rating) -> list[DebateMessa
 
         debate.append(DebateMessage(speaker=agent.name, stance=agent.stance, message=message, tone=tone))
     return debate
+
+
+def build_investment_committee_debate(
+    context,
+    agents: list[AgentInsight],
+    rating: Rating,
+    research: EquityResearchReport,
+    target_price: TargetPriceResult,
+) -> list[DebateMessage]:
+    by_name = {agent.name: agent for agent in agents}
+    messages = [
+        _committee_message(
+            "主持人",
+            rating,
+            "本次投資委員會將依序檢視估值、基本面、技術面、籌碼與風險；規則式目標價只作為估值參考，不單獨決定評級。",
+            "summary",
+            [f"綜合評級 {rating}", f"資料缺口 {len(research.dataGaps)} 項"],
+        ),
+        _valuation_message(target_price, rating),
+        _agent_committee_message("基本面分析師", by_name.get("基本面 Agent"), rating, research.financialAnalysis),
+        _agent_committee_message("技術面分析師", by_name.get("技術分析 Agent"), rating, research.keyMetrics),
+        _agent_committee_message("籌碼分析師", by_name.get("籌碼分析 Agent"), rating, research.keyMetrics),
+        _agent_committee_message("風控主管", by_name.get("風險控管 Agent"), rating, research.risks, force_risk=True),
+        _committee_message(
+            "反方分析師",
+            rating,
+            "反方要求在成長、價格或籌碼證據轉弱時重新評估，不因單一規則式目標價維持偏多結論。"
+            + (f" {research.variantView[0]}" if research.variantView else ""),
+            "risk",
+            (research.variantView or research.risks or ["資料可能延遲或不完整"])[0:3],
+        ),
+        _committee_message(
+            "主持人",
+            rating,
+            f"委員會共識維持 {rating}；評級仍由技術面、基本面、籌碼、風險與資料品質共同形成。",
+            "summary",
+            (research.investmentThesis + research.risks)[0:3],
+        ),
+    ]
+    return messages
+
+
+def _valuation_message(target_price: TargetPriceResult, rating: Rating) -> DebateMessage:
+    if target_price.valuationMethod == "INSUFFICIENT_DATA":
+        content = "EPS 或 PE 口徑資料不足，暫不產生正式 12M 目標價。"
+        tags = target_price.limitations[0:3]
+        return _committee_message("估值分析師", rating, content, "neutral", tags)
+    content = (
+        f"規則式估值參考區間為 Bear {target_price.bearTargetPrice}、Base {target_price.baseTargetPrice}、"
+        f"Bull {target_price.bullTargetPrice}；目前 PE {format_pe_for_research(target_price.fairPERatio)}，"
+        f"Base 隱含空間 {target_price.impliedUpsidePct:.1f}%。"
+    )
+    tags = [f"EPS basis {target_price.epsBasis}", f"PE source {target_price.peSource}", f"confidence {target_price.confidence}/65"]
+    return _committee_message("估值分析師", rating, content, "neutral", tags)
+
+
+def _agent_committee_message(
+    role: str,
+    agent: AgentInsight | None,
+    fallback_stance: Rating,
+    fallback_evidence: list[str],
+    force_risk: bool = False,
+) -> DebateMessage:
+    if agent is None:
+        return _committee_message(role, fallback_stance, "本角色可用資料不足，維持保留意見。", "neutral", fallback_evidence[0:3])
+    content = agent.narrative or agent.summary
+    tone = "risk" if force_risk or agent.score < 0 else "support" if agent.score > 0 else "neutral"
+    evidence = (agent.evidence or fallback_evidence)[0:3]
+    return _committee_message(role, agent.stance, content, tone, evidence)
+
+
+def _committee_message(
+    role: str,
+    stance: Rating,
+    content: str,
+    tone: str,
+    evidence_tags: list[str],
+) -> DebateMessage:
+    return DebateMessage(
+        speaker=role,
+        role=role,
+        stance=stance,
+        message=content,
+        content=content,
+        tone=tone,
+        evidenceTags=unique_items([str(item) for item in evidence_tags if item]),
+    )
+
+
+def format_pe_for_research(value: float | None) -> str:
+    if value is None:
+        return "資料暫無"
+    formatted = f"{value:.2f}".rstrip("0").rstrip(".")
+    return formatted if "." in formatted else f"{formatted}.0"
+
+
+def fmt_price(value: float | None) -> str:
+    return fmt_number(value, decimals=0)
 
 
 def score_to_rating(score: float) -> Rating:
