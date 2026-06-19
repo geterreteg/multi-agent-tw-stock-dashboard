@@ -1,5 +1,14 @@
 # 專案交接紀錄
 
+## 2026-06-19 受控自動修復排查
+
+- 目前分支為 `fix/chip-data-latest-available`，HEAD `24efce8`，工作區乾淨且已與同名 remote branch 同步；`main` / `origin/main` 仍為 `c78f149`。
+- 正式前端 `https://multi-agent-tw-stock-dashboard-live.vercel.app` 的當前 production 部署建立於 2026-06-14 14:44:45，與 `c78f149` 的提交時間及已編譯 UI 內容一致，未包含 6/18 籌碼修正。
+- 正式前端的實際 request URL 為 `https://multi-agent-stock-api-staging.onrender.com/api/analyze`。該 backend 仍是舊版：2330 `chipData.margin` 沒有 `status` / `dataDate`，`overallStatus` 也未回傳，並以 `JSONDecodeError` 回傳 margin 資料缺口。
+- 本機分支 E2E 對 2330 與 8299 均回傳 `overallStatus=latest_available`、margin `status=latest_available`、`dataDate=2026-06-18`、`dataGaps=0`。
+- Fresh 驗證：FastAPI unittest 14/14 通過、TypeScript 通過、`npm run dev` 首頁 HTTP 200、`git diff --check` 通過。
+- 本次沒有修改前後端程式碼、secrets、`.env` 或部署設定，也沒有 merge / push。需由使用者確認 production branch 與部署流程後才能處理。
+
 ## 本次初始化日期
 
 2026-06-18（Asia/Taipei）

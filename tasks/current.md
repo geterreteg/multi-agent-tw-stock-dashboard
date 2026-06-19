@@ -33,15 +33,14 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 
 - 根目錄 `render.yaml` 定義 Streamlit Render Web Service，啟動指令為 `python -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0`。
 - `api/render.yaml` 定義 FastAPI Render Web Service，啟動指令為 `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`。
-- `next-dashboard/.env.example` 定義 `NEXT_PUBLIC_API_BASE_URL`；repo 有 Next.js 建置與 Vercel 相關本機產物，但線上 Vercel 部署是否目前有效，**待確認**。
-- Render 與 Vercel 目前的實際線上版本、URL、健康狀態與環境變數值，**待確認**。
-- 本文件只記錄 repo 內設定，不宣稱已完成線上驗證。
+- 正式前端 alias 為 `https://multi-agent-tw-stock-dashboard-live.vercel.app`；當前 production 部署建立於 2026-06-14 14:44:45，內容對應 `main` 的 `c78f149`，未包含 2026-06-18 籌碼修正。
+- 正式前端已編譯 bundle 的 API base 為 `https://multi-agent-stock-api-staging.onrender.com`。該 backend 仍回傳舊版 `chipData` 契約，2330 margin 缺少 `status` / `dataDate`，並因 `JSONDecodeError` 列為資料缺口。
 
 ## 資料來源與外部服務限制
 
 - Streamlit legacy：股價使用 yfinance，基本面與籌碼使用 FinMind。
 - FastAPI 現行程式：股價優先使用 TWSE / TPEx 官方日 K，可降級使用 yfinance；基本面使用 FinMind。
-- 目前 `fix/chip-data-latest-available` 未提交變更正在將 FastAPI 籌碼分析統一為 TWSE / TPEx 官方 `chipData`，FinMind 的兩個籌碼 dataset 已從 FastAPI 主動請求清單移出。
+- `fix/chip-data-latest-available` 已將 FastAPI 籌碼分析統一為 TWSE / TPEx 官方 `chipData`，FinMind 的兩個籌碼 dataset 已從 FastAPI 主動請求清單移出。目前分支 HEAD 為 `24efce8`，工作區乾淨且已與同名 remote branch 同步。
 - FinMind token 不得由一般使用者輸入，不得顯示、列印、寫入報告或提交到 Git。
 - 無 FinMind token 時會嘗試公開限制模式，資料完整度可能下降。
 - yfinance 不是 Yahoo Finance 官方 API。
@@ -57,13 +56,13 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 
 ## 目前已知限制
 
-- 工作區不乾淨：目前分支為 `fix/chip-data-latest-available`，有 FastAPI 籌碼資料、評分、報告、前端型別與 UI 的未提交變更。
+- 目前分支為 `fix/chip-data-latest-available`，HEAD `24efce8`，工作區乾淨。修正尚未進入 `main`，正式前後端也尚未部署這些提交。
 - TWSE 融資 parser 已支援 `代號` / `股票代號` / `證券代號`；2330 真實官方 API smoke test 已確認 margin 不再誤判為 `missing`。
 - `chipData.overallStatus` 已由後端依 institutional / margin 狀態合併為 `current` / `latest_available` / `partial` / `missing`，前端直接顯示該欄位。
 - 風險控管的融資壓力扣分已套用 `current=1.0` / `latest_available=0.75` / `missing=0.0` 狀態權重。
 - `app.py` 仍是使用 FinMind 籌碼的獨立 legacy 流程，而根目錄 Render 設定仍會啟動此 Streamlit 應用。
 - FastAPI `main.py` 的 description 仍稱為 mock backend，但 `/api/analyze` 已呼叫實際分析服務。
-- README、DEPLOYMENT、PRODUCT_PLAN、AGENTS 內的資料源描述以 Streamlit / FinMind 籌碼為主，與未提交的 FastAPI 官方籌碼方向存在差異。
+- README、DEPLOYMENT、PRODUCT_PLAN、AGENTS 內的資料源描述以 Streamlit / FinMind 籌碼為主，與分支中 FastAPI 官方籌碼方向存在差異。
 - 部分 Next.js 頁面是 placeholder，實際產品範圍與優先順序**待確認**。
 
 ## 常用開發與驗證指令
@@ -98,9 +97,9 @@ npm.cmd run build
 
 ## 目前待辦
 
-1. 檢視此分支完整 diff，確認範圍後才能決定是否提交；目前不要 commit。
+1. 檢視 `main..fix/chip-data-latest-available` 完整 diff 後，由使用者決定是否將現有提交整合到 production branch；Codex 不得自行 merge 或 push。
 2. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
-3. 確認實際 Render / Vercel 部署與線上 API 狀態。
+3. 由使用者確認 production branch 與部署流程，再將新版前端與 FastAPI 部署到正式環境，並確認 production API base 不再誤指 staging。
 4. 在資料流程穩定後，再以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
 
 ## 不能亂改的地方
