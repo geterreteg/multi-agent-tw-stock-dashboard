@@ -1,5 +1,14 @@
 # 專案交接紀錄
 
+## 2026-06-19 新版 Production 驗證
+
+- `main` 已在 `f593ffc` 整合籌碼修正；`multi-agent-tw-stock-dashboard-next` 已將該 commit 部署為 Ready production，正式驗收 URL 應使用 `https://multi-agent-tw-stock-dashboard-next.vercel.app`。
+- 舊 `multi-agent-tw-stock-dashboard-live` 仍停在 `c78f149`，不用於本輪驗收。
+- 新版前端公開 bundle 顯示 `/api/analyze` 實際指向 `https://multi-agent-stock-api-staging.onrender.com/api/analyze`。
+- 該 staging backend 的 2330 / 8299 response 均缺少 institutional / margin `status`、`dataDate` 與 top-level `overallStatus`，確認仍為舊版 FastAPI。
+- 新版 UI mapping 有正確顯示資料狀態、日期與總體 badge；目前 2330 / 8299 顯示「官方資料缺失」是因 backend 契約未升級，不是 repo 內前端 mapping 錯誤。
+- 下一步需在部署平台部署新版 FastAPI，再將 `multi-agent-tw-stock-dashboard-next` Production 的 `NEXT_PUBLIC_API_BASE_URL` 改為該正式 backend origin。本次未修改程式碼或平台設定。
+
 ## 2026-06-19 受控自動修復排查
 
 - 目前分支為 `fix/chip-data-latest-available`，HEAD `24efce8`，工作區乾淨且已與同名 remote branch 同步；`main` / `origin/main` 仍為 `c78f149`。
