@@ -57,6 +57,8 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 
 ## 目前已知限制
 
+- FastAPI / Next.js 已新增 TWSE 上市股票歷史 PE：取最近 36 個已完成月份的月末 PE，月末無資料時往前最多 10 天，並提供 JSON cache 降級。第一版不支援 TPEx。
+- 規則式估值區間只在 TTM EPS 且歷史 PE 有效樣本至少 12 筆時，使用 p25 / median / p75 作為 Bear / Base / Bull PE；樣本不足時才降級使用 currentPE 固定折溢價。
 - 目前 `main` 已包含 `f593ffc` 與後續文件提交。Render production FastAPI 與 Vercel Production API base 皆已升級，2330 / 8299 正式資料流驗收通過。
 - TWSE 融資 parser 已支援 `代號` / `股票代號` / `證券代號`；2330 真實官方 API smoke test 已確認 margin 不再誤判為 `missing`。
 - `chipData.overallStatus` 已由後端依 institutional / margin 狀態合併為 `current` / `latest_available` / `partial` / `missing`，前端直接顯示該欄位。
@@ -98,9 +100,9 @@ npm.cmd run build
 
 ## 目前待辦
 
-1. `codex/target-price-personal-tool-v1` 已完成第一版規則式 Target Price Engine、研究報告語氣、辯論室與 localStorage 決策筆記；尚未 merge、push 或部署 production。
+1. `main` 已包含第一版規則式 Target Price Engine、研究報告語氣、辯論室與 localStorage 決策筆記；本次歷史 PE 擴充尚未 commit、push 或部署 production。
 2. 目前 FinMind 財報一般 EPS 欄位只能保守辨識為單季 EPS。2330 實測因此回傳 `INSUFFICIENT_DATA`，未產生無法追溯的 12M 目標價。
-3. 未來若要提高估值覆蓋率，需加入可驗證的 forward / TTM EPS，或能明確區分單季與累計口徑的近四季 EPS；歷史 PE、同業 PE、DCF 與法人一致性預估仍未納入。
+3. 未來若要讓 2330 等目前只有單季 EPS 的股票產生規則式估值區間，仍需加入可驗證的 forward / TTM EPS，或能明確區分單季與累計口徑的近四季 EPS；同業 PE、DCF 與法人一致性預估仍未納入。
 4. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
 5. 以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
 

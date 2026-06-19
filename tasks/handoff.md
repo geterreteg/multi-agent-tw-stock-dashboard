@@ -1,5 +1,15 @@
 # 專案交接紀錄
 
+## 2026-06-20 TWSE 歷史 PE 區間
+
+- 新增 `api/app/services/pe_history.py`，第一版僅支援 TWSE 上市股票；使用 TWSE `BWIBBU_d` 每日本益比資料，取最近 36 個已完成月份的月末 PE，並在無可用值時往前最多回溯 10 天。
+- parser 過濾 `--`、空值、0、負數、非數字與非有限值；輸出 min / p25 / median / p75 / max / validSampleCount，分位數採線性插值。
+- 成功取得後寫入 `api/.cache/pe_history/<symbol>.json`（Git 已忽略）；TWSE 網路、JSON 或無可用樣本時會優先讀取上次成功 cache，API 以 `cacheStatus` 揭露 live / cache / missing。
+- `target_price.py` 在 `epsBasis=TTM` 且歷史 PE 有效樣本至少 12 筆時，使用 p25 / median / p75 作為 Bear / Base / Bull PE；否則只在 currentPE 可用時降級為 0.90x / 1.00x / 1.10x。單季 EPS 即使有完整歷史 PE 也不產生估值區間。
+- Next.js「基本面 / 估值」tab 已顯示歷史 PE 五數摘要、樣本數、來源、cache 狀態與資料限制；系統產生的文案改稱「規則式估值區間」或「歷史 PE 估值參考」。
+- 2330 真實 smoke test：歷史 PE 36 筆，min=14.04、p25=19.84、median=23.82、p75=26.88、max=32.23；但 FinMind EPS basis 仍為 `SINGLE_QUARTER`，因此 `targetPrice.valuationMethod=INSUFFICIENT_DATA`，沒有產生規則式估值區間。
+- 驗證：FastAPI unittest 37/37、TypeScript 與 Next.js production build 通過。本次沒有修改部署設定、secrets、環境變數或套件版本，也尚未 commit、push 或部署。
+
 ## 2026-06-19 Target Price 與個人工具第一版（隔離分支）
 
 - 工作分支：`codex/target-price-personal-tool-v1`；隔離 worktree：`.worktrees/codex-target-price-personal-tool-v1`。尚未 merge、push 或部署 production。

@@ -1,7 +1,7 @@
 import type { TargetPrice } from "@/lib/types";
 
 export const TARGET_PRICE_DISCLOSURE =
-  "本目標價採規則式 PE Multiple 法，以目前可驗證本益比作為 Base Case 估值基準，並以固定折溢價建立 Bear / Bull 情境。由於尚未納入歷史 PE 區間、同業估值、DCF 與法人一致性預估，本目標價應視為估值參考區間，而非正式法人目標價。";
+  "本規則式估值區間採 PE Multiple 法：TTM EPS 且歷史 PE 樣本足夠時，使用 p25 / median / p75 建立 Bear / Base / Bull；樣本不足時才以 currentPE 固定折溢價降級。本結果僅為規則式估值參考。";
 
 export const INSUFFICIENT_TARGET_PRICE: TargetPrice = {
   currentPrice: null,
@@ -17,7 +17,7 @@ export const INSUFFICIENT_TARGET_PRICE: TargetPrice = {
   bullPERatio: null,
   confidence: 0,
   assumptions: [],
-  limitations: ["資料不足，暫不產生正式 12M 目標價。"],
+  limitations: ["資料不足，暫不產生規則式估值區間。"],
   peSource: "UNAVAILABLE",
 };
 
@@ -43,5 +43,5 @@ export function targetPriceSummary(targetPrice?: TargetPrice): string {
   const target = normalizeTargetPrice(targetPrice);
   return target.valuationMethod === "RULE_BASED_PE_MULTIPLE"
     ? `${formatTaiwanPrice(target.baseTargetPrice)}（${formatTargetUpside(target.impliedUpsidePct)}）`
-    : "資料不足，暫不產生正式 12M 目標價";
+    : "資料不足，暫不產生規則式估值區間";
 }

@@ -1,18 +1,58 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import fields
 from types import SimpleNamespace
 
 import pandas as pd
+from pydantic import ValidationError
 
 from app import models
-from app.services.agents import build_investment_committee_debate
+from app.services.agents import build_investment_committee_debate, build_recommendation_text
+from app.services.analysis import historical_pe_to_model
 from app.services.market_data import summarize_financials
+from app.services.pe_history import HistoricalPEResult
 from app.services.reports import generate_markdown_report
-from app.services.target_price import EpsEvidence, build_target_price
+from app.services.target_price import EpsEvidence, TargetPriceResult, build_target_price
 
 
 class TargetPriceEngineTests(unittest.TestCase):
+    def test_historical_pe_builds_range_for_ttm_eps(self) -> None:
+        for basis in ("TTM", "TTM_EPS"):
+            with self.subTest(basis=basis):
+                result = build_target_price(
+                    current_price=100,
+                    eps=EpsEvidence(basis=basis, value=5, source="FinMind TTM EPS"),
+                    current_pe=40,
+                    pe_source="EXTERNAL",
+                    historical_pe=_historical_pe(15, 20, 25, sample_count=36),
+                )
+
+                self.assertEqual("RULE_BASED_PE_MULTIPLE", result.valuationMethod)
+                self.assertEqual(75, result.bearTargetPrice)
+                self.assertEqual(100, result.baseTargetPrice)
+                self.assertEqual(125, result.bullTargetPrice)
+                self.assertEqual(15, result.bearPERatio)
+                self.assertEqual(20, result.fairPERatio)
+                self.assertEqual(25, result.bullPERatio)
+                self.assertEqual("HISTORICAL_TWSE", result.peSource)
+                self.assertTrue(any("已納入 TWSE 歷史 PE" in item for item in result.limitations))
+                self.assertTrue(any("尚未納入 TPEx" in item for item in result.limitations))
+
+    def test_insufficient_historical_pe_falls_back_to_current_pe(self) -> None:
+        result = build_target_price(
+            current_price=100,
+            eps=EpsEvidence(basis="TTM", value=5, source="FinMind TTM EPS"),
+            current_pe=20,
+            pe_source="EXTERNAL",
+            historical_pe=_historical_pe(15, 20, 25, sample_count=11),
+        )
+
+        self.assertEqual(90, result.bearTargetPrice)
+        self.assertEqual(100, result.baseTargetPrice)
+        self.assertEqual(110, result.bullTargetPrice)
+        self.assertEqual("EXTERNAL", result.peSource)
+
     def test_external_pe_builds_rule_based_range(self) -> None:
         result = build_target_price(
             current_price=100,
@@ -39,12 +79,15 @@ class TargetPriceEngineTests(unittest.TestCase):
             eps=EpsEvidence(basis="SINGLE_QUARTER", value=2, source="FinMind single-quarter EPS"),
             current_pe=20,
             pe_source="EXTERNAL",
+            historical_pe=_historical_pe(15, 20, 25, sample_count=36),
         )
 
         self.assertEqual("INSUFFICIENT_DATA", result.valuationMethod)
         self.assertIsNone(result.baseTargetPrice)
         self.assertEqual(0, result.confidence)
         self.assertTrue(any("單季 EPS" in item for item in result.limitations))
+        self.assertTrue(any("歷史 PE 已有 36 筆" in item for item in result.limitations))
+        self.assertFalse(any("樣本不足 12 筆" in item for item in result.limitations))
 
     def test_external_pe_mismatch_is_insufficient(self) -> None:
         result = build_target_price(
@@ -57,7 +100,7 @@ class TargetPriceEngineTests(unittest.TestCase):
         self.assertEqual("INSUFFICIENT_DATA", result.valuationMethod)
         self.assertTrue(any("口徑不一致" in item for item in result.limitations))
 
-    def test_derived_pe_is_not_presented_as_independent_validation(self) -> None:
+    def test_missing_historical_and_current_pe_is_insufficient(self) -> None:
         result = build_target_price(
             current_price=100,
             eps=EpsEvidence(basis="FOUR_QUARTERS", value=5, source="FinMind quarterly EPS"),
@@ -65,11 +108,11 @@ class TargetPriceEngineTests(unittest.TestCase):
             pe_source="UNAVAILABLE",
         )
 
-        self.assertEqual("RULE_BASED_PE_MULTIPLE", result.valuationMethod)
-        self.assertEqual("DERIVED", result.peSource)
-        self.assertEqual(60, result.confidence)
-        self.assertTrue(any("外部 PE" in item for item in result.limitations))
-        self.assertFalse(any("獨立驗證" in item for item in result.assumptions))
+        self.assertEqual("INSUFFICIENT_DATA", result.valuationMethod)
+        self.assertIsNone(result.baseTargetPrice)
+        self.assertIsNone(result.bearTargetPrice)
+        self.assertIsNone(result.bullTargetPrice)
+        self.assertTrue(any("current PE" in item for item in result.limitations))
 
     def test_valuation_gaps_cap_confidence_at_50(self) -> None:
         result = build_target_price(
@@ -162,6 +205,42 @@ class TargetPriceApiTests(unittest.TestCase):
             }.issubset(field_names)
         )
 
+    def test_api_model_exposes_historical_pe_contract(self) -> None:
+        historical_model = getattr(models, "HistoricalPE", None)
+
+        self.assertIsNotNone(historical_model)
+        self.assertTrue(
+            {
+                "minPE",
+                "p25PE",
+                "medianPE",
+                "p75PE",
+                "maxPE",
+                "validSampleCount",
+                "source",
+                "cacheStatus",
+                "dataLimitations",
+            }.issubset(set(historical_model.model_fields))
+        )
+        self.assertIn("historicalPE", models.AnalyzeResponse.model_fields)
+
+    def test_dataclass_and_pydantic_contracts_match_exactly(self) -> None:
+        target_fields = {item.name for item in fields(TargetPriceResult)}
+        historical_fields = {item.name for item in fields(HistoricalPEResult)} - {"symbol", "samples"}
+
+        self.assertEqual(target_fields, set(models.TargetPrice.model_fields))
+        self.assertEqual(historical_fields, set(models.HistoricalPE.model_fields))
+        converted = historical_pe_to_model(_historical_pe(15, 20, 25, sample_count=36))
+        self.assertEqual(36, converted.validSampleCount)
+        self.assertEqual(20, converted.medianPE)
+
+    def test_contract_models_reject_unknown_fields_instead_of_ignoring_them(self) -> None:
+        self.assertEqual("forbid", models.AnalyzeResponse.model_config.get("extra"))
+        with self.assertRaises(ValidationError):
+            models.TargetPrice(unexpectedField=1)
+        with self.assertRaises(ValidationError):
+            models.HistoricalPE(peHistory={})
+
     def test_insufficient_target_price_does_not_change_rating(self) -> None:
         context = _report_context(eps=2, pe_ratio=20)
         target_price = build_target_price(
@@ -186,6 +265,15 @@ class TargetPriceApiTests(unittest.TestCase):
 
 
 class TargetPriceReportTests(unittest.TestCase):
+    def test_recommendation_text_reports_actual_historical_pe_scope(self) -> None:
+        context = _report_context(eps=5, pe_ratio=20)
+        context.historical_pe = _historical_pe(15, 20, 25, sample_count=36)
+
+        text = build_recommendation_text(context, _research("Buy / 看多"), 60)
+
+        self.assertIn("已取得 TWSE 歷史 PE", text)
+        self.assertIn("尚未納入 TPEx", text)
+        self.assertNotIn("尚未納入歷史 PE", text)
     def test_report_uses_institutional_structure_and_rule_based_disclosure(self) -> None:
         context = _report_context(eps=5, pe_ratio=20)
         target_price = build_target_price(
@@ -214,8 +302,8 @@ class TargetPriceReportTests(unittest.TestCase):
         self.assertIn("目前 PE：20.0", report)
         self.assertIn("最新收盤價：100\n", report)
         self.assertNotIn("最新收盤價：100.00", report)
-        self.assertIn("規則式 PE Multiple 法", report)
-        self.assertIn("而非正式法人目標價", report)
+        self.assertIn("規則式估值區間採 PE Multiple 法", report)
+        self.assertIn("僅為規則式估值參考", report)
 
     def test_insufficient_report_has_no_invented_target_price(self) -> None:
         context = _report_context(eps=2, pe_ratio=20)
@@ -234,7 +322,7 @@ class TargetPriceReportTests(unittest.TestCase):
             target_price=target_price,
         )
 
-        self.assertIn("資料不足，暫不產生正式 12M 目標價", report)
+        self.assertIn("資料不足，暫不產生規則式估值區間", report)
         self.assertNotIn("Bear：", report)
 
 
@@ -251,6 +339,22 @@ def _agent(name: str, stance: str, evidence: list[str]):
         degraded=False,
         reasons=evidence,
         risks=["資料可能延遲"],
+    )
+
+
+def _historical_pe(p25: float, median: float, p75: float, sample_count: int) -> HistoricalPEResult:
+    return HistoricalPEResult(
+        symbol="2330",
+        minPE=10,
+        p25PE=p25,
+        medianPE=median,
+        p75PE=p75,
+        maxPE=30,
+        validSampleCount=sample_count,
+        source="TWSE 個股日本益比、殖利率及股價淨值比",
+        cacheStatus="live",
+        dataLimitations=[],
+        samples=[],
     )
 
 

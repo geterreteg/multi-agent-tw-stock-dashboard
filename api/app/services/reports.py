@@ -109,7 +109,7 @@ def generate_markdown_report(
 
 {research_sections}
 
-## 四、12M 規則式目標價與估值參考區間
+## 四、規則式估值區間與歷史 PE 估值參考
 {target_price_section}
 
 ## 五、多 Agent 分析
@@ -121,7 +121,7 @@ def generate_markdown_report(
 ## 七、最終研究結論
 
 ### 結論
-綜合評級：{final_rating}。本評級仍綜合技術面、基本面、籌碼、風險與資料品質；規則式目標價不單獨主導評級。
+綜合評級：{final_rating}。本評級仍綜合技術面、基本面、籌碼、風險與資料品質；規則式估值區間不單獨主導評級。
 
 finalScore：{decision.finalScore:.2f}
 
@@ -161,7 +161,7 @@ def fmt_pe_metric(context) -> str:
 def format_target_price_section(target_price: TargetPriceResult | None) -> str:
     if target_price is None or target_price.valuationMethod == "INSUFFICIENT_DATA":
         limitations = target_price.limitations if target_price is not None else ["後端未提供 targetPrice 契約。"]
-        return "資料不足，暫不產生正式 12M 目標價。\n\n" + list_markdown(limitations)
+        return "資料不足，暫不產生規則式估值區間。\n\n" + list_markdown(limitations)
     return (
         f"- Bear：{target_price.bearTargetPrice}\n"
         f"- Base：{target_price.baseTargetPrice}\n"

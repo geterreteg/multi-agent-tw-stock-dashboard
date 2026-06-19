@@ -253,7 +253,7 @@ function ResearchHeader({
         <QuoteStripItem label="綜合分數" value={formatScore(finalScore)} />
         <QuoteStripItem label="最新收盤" value={formatPlainMetric(data.metrics.latestClose)} />
         <QuoteStripItem label="20 日報酬" value={formatSignedMetric(data.metrics.return20d, "%")} />
-        <QuoteStripItem label="12M 規則式目標價" value={targetPriceSummary(data.targetPrice)} />
+        <QuoteStripItem label="規則式估值區間" value={targetPriceSummary(data.targetPrice)} />
         <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
         <QuoteStripItem label="來源狀態" value={formatSourceNames(sources, hasFinMindPublicMode)} tone={dataQualityTone} />
       </div>
@@ -607,7 +607,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             <div className="grid gap-5 p-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start lg:p-6">
               {summaryPanel}
               <div className={`min-w-0 grid gap-4 ${isRiskPanel ? "md:grid-cols-2 xl:grid-cols-2" : "md:grid-cols-2"}`}>
-                {activePanel.id === "fundamental" ? <TargetPricePanel targetPrice={data.targetPrice} /> : null}
+                {activePanel.id === "fundamental" ? <TargetPricePanel targetPrice={data.targetPrice} historicalPE={data.historicalPE} /> : null}
                 {activePanel.showCharts ? (
                   <div className="md:col-span-2">
                     <StockCharts data={data} />

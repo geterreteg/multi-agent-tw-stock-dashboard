@@ -474,15 +474,27 @@ def build_recommendation_text(context, report: EquityResearchReport, final_score
     gaps = f" 資料缺口：{sentence_join(report.dataGaps[:3])}" if report.dataGaps else ""
     pe_note = " EPS 為負或 PE 無效，因此本益比不具一般估值意義，不能解讀為便宜。" if pe_not_meaningful(context) else ""
     data_limits = sentence_join(report.dataGaps[:3]) if report.dataGaps else "核心資料可用，但仍可能延遲或不完整。"
+    historical_pe_scope = historical_pe_scope_text(context)
     return (
         f"結論：{context.stock_id} {context.stock_name} 的規則式評級為 {report.recommendation}，"
         f"目前觀點為「{action}」。評級綜合技術面、基本面、籌碼、風險與資料品質，"
         f"finalScore {final_score:.1f}/100，confidenceScore {report.confidenceScore}/100。{reason}{pe_note}\n"
         f"依據：{strategy} 轉強條件包括 {stronger}；關鍵觀察指標為 {indicators}。\n"
         f"風險：{risks} 轉弱條件包括 {weaker}。\n"
-        f"資料限制：{data_limits}。{gaps}尚未納入歷史 PE、同業 PE、DCF 與法人一致性預估。"
+        f"資料限制：{data_limits}。{gaps}{historical_pe_scope}"
         "本結論僅供課程研究與資料分析展示，不構成正式投資建議或獲利保證。"
     )
+
+
+def historical_pe_scope_text(context) -> str:
+    historical_pe = getattr(context, "historical_pe", None)
+    sample_count = getattr(historical_pe, "validSampleCount", 0)
+    if sample_count > 0:
+        return (
+            f"已取得 TWSE 歷史 PE（有效樣本 {sample_count} 筆），是否套用取決於 EPS basis 與樣本門檻；"
+            "尚未納入 TPEx、同業 PE、DCF、法人一致性預估。"
+        )
+    return "本次未取得可用 TWSE 歷史 PE；尚未納入 TPEx、同業 PE、DCF、法人一致性預估。"
 
 
 def recommendation_action_label(recommendation: Rating) -> str:
@@ -880,7 +892,7 @@ def build_investment_committee_debate(
         _committee_message(
             "主持人",
             rating,
-            "本次投資委員會將依序檢視估值、基本面、技術面、籌碼與風險；規則式目標價只作為估值參考，不單獨決定評級。",
+            "本次投資委員會將依序檢視估值、基本面、技術面、籌碼與風險；規則式估值區間只作為估值參考，不單獨決定評級。",
             "summary",
             [f"綜合評級 {rating}", f"資料缺口 {len(research.dataGaps)} 項"],
         ),
@@ -892,7 +904,7 @@ def build_investment_committee_debate(
         _committee_message(
             "反方分析師",
             rating,
-            "反方要求在成長、價格或籌碼證據轉弱時重新評估，不因單一規則式目標價維持偏多結論。"
+            "反方要求在成長、價格或籌碼證據轉弱時重新評估，不因單一規則式估值區間維持偏多結論。"
             + (f" {research.variantView[0]}" if research.variantView else ""),
             "risk",
             (research.variantView or research.risks or ["資料可能延遲或不完整"])[0:3],
@@ -910,7 +922,7 @@ def build_investment_committee_debate(
 
 def _valuation_message(target_price: TargetPriceResult, rating: Rating) -> DebateMessage:
     if target_price.valuationMethod == "INSUFFICIENT_DATA":
-        content = "EPS 或 PE 口徑資料不足，暫不產生正式 12M 目標價。"
+        content = "EPS 或 PE 口徑資料不足，暫不產生規則式估值區間。"
         tags = target_price.limitations[0:3]
         return _committee_message("估值分析師", rating, content, "neutral", tags)
     content = (
