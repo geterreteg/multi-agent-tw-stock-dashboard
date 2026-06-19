@@ -64,6 +64,7 @@ type ResearchTab = {
   description: string;
   icon: LucideIcon;
   groups: ResearchTabGroup[];
+  badges?: ResearchTabBadge[];
   highlights?: ResearchTabHighlight[];
   showCharts?: boolean;
 };
@@ -472,12 +473,20 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
       label: "籌碼與風險",
       description: "呈現官方三大法人、融資融券、風險與反方觀點；官方資料不可用時列為資料缺口。",
       icon: AlertTriangle,
+      badges: [{
+        label: formatChipStatus(data.chipData?.overallStatus),
+        tone: data.chipData?.overallStatus === "missing" || data.chipData?.overallStatus === "partial" ? "gap" : "ok",
+      }],
       groups: [
         {
           title: "三大法人買賣超",
-          items: [`資料來源：${formatOfficialText(institutional?.source)}`, `資料日期：${formatOfficialDate(institutional?.asOfDate)}`],
-          tone: institutional?.dataGaps?.length ? "gap" : "default",
-          badges: [{ label: institutional?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: institutional?.dataGaps?.length ? "gap" : "ok" }],
+          items: [
+            `資料來源：${formatOfficialText(institutional?.source)}`,
+            `資料狀態：${formatChipStatus(institutional?.status)}`,
+            `資料日期：${formatOfficialDate(institutional?.dataDate ?? institutional?.asOfDate)}`,
+          ],
+          tone: institutional?.status === "missing" ? "gap" : "default",
+          badges: [{ label: formatChipStatus(institutional?.status), tone: institutional?.status === "missing" ? "gap" : "ok" }],
           metrics: [
             { label: "外資買賣超", value: formatOfficialInteger(institutional?.foreignNetBuy, "股"), tone: officialNumberTone(institutional?.foreignNetBuy) },
             { label: "投信買賣超", value: formatOfficialInteger(institutional?.investmentTrustNetBuy, "股"), tone: officialNumberTone(institutional?.investmentTrustNetBuy) },
@@ -487,9 +496,13 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
         },
         {
           title: "融資融券",
-          items: [`資料來源：${formatOfficialText(margin?.source)}`, `資料日期：${formatOfficialDate(margin?.asOfDate)}`],
-          tone: margin?.dataGaps?.length ? "gap" : "default",
-          badges: [{ label: margin?.dataGaps?.length ? "官方資料缺口" : "官方資料", tone: margin?.dataGaps?.length ? "gap" : "ok" }],
+          items: [
+            `資料來源：${formatOfficialText(margin?.source)}`,
+            `資料狀態：${formatChipStatus(margin?.status)}`,
+            `資料日期：${formatOfficialDate(margin?.dataDate ?? margin?.asOfDate)}`,
+          ],
+          tone: margin?.status === "missing" ? "gap" : "default",
+          badges: [{ label: formatChipStatus(margin?.status), tone: margin?.status === "missing" ? "gap" : "ok" }],
           metrics: [
             { label: "融資餘額", value: formatOfficialInteger(margin?.marginBalance, "張") },
             { label: "融資增減", value: formatOfficialInteger(margin?.marginChange, "張"), tone: officialNumberTone(margin?.marginChange) },
@@ -593,9 +606,20 @@ function TabSummaryPanel({ panel, icon: Icon, extraGroups = [] }: { panel: Resea
   return (
     <div className="grid self-start gap-4">
       <aside className="rounded-2xl border border-[#e4dccf] bg-[#fbf7ef] p-5 shadow-[0_12px_30px_rgba(57,49,37,.045)]">
-        <div className="flex items-center gap-2 text-[#7d5d2e]">
-          <Icon className="h-5 w-5" />
-          <p className="text-sm font-semibold">{panel.label}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[#7d5d2e]">
+          <div className="flex items-center gap-2">
+            <Icon className="h-5 w-5" />
+            <p className="text-sm font-semibold">{panel.label}</p>
+          </div>
+          {panel.badges && panel.badges.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {panel.badges.map((badge) => (
+                <Badge key={`${panel.id}-${badge.label}`} className={researchBadgeClass(badge.tone)}>
+                  {badge.label}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
         </div>
         <p className="mt-3 text-xs leading-6 text-[#746b60]">{panel.description}</p>
         {panel.highlights && panel.highlights.length > 0 ? (
@@ -1164,6 +1188,13 @@ function formatOfficialText(value: string | null | undefined) {
 
 function formatOfficialDate(value: string | null | undefined) {
   return value && value.trim().length > 0 ? value : "日期未提供";
+}
+
+function formatChipStatus(value: "current" | "latest_available" | "partial" | "missing" | undefined) {
+  if (value === "current") return "當日官方資料";
+  if (value === "latest_available") return "最近可得官方資料";
+  if (value === "partial") return "部分官方資料";
+  return "官方資料缺失";
 }
 
 function formatOfficialInteger(value: number | null | undefined, unit = "") {

@@ -79,7 +79,13 @@ def generate_markdown_report(
 - 產業分類：{context.industry}
 - 最後更新時間：{context.last_updated}
 - 股價資料來源：{YFINANCE_SOURCE}
-- 基本面與籌碼資料來源：{FINMIND_SOURCE}
+- 基本面資料來源：{FINMIND_SOURCE}
+- 籌碼資料來源：{context.institutional_source}
+- 籌碼資料狀態：{context.institutional_status}
+- 法人資料日期：{context.institutional_data_date or '資料暫無'}
+- 融資融券資料來源：{context.margin_source}
+- 融資融券資料狀態：{context.margin_status}
+- 融資融券資料日期：{context.margin_data_date or '資料暫無'}
 - 最新收盤價：{fmt_number(context.latest_close)}
 - MA20：{fmt_number(context.ma20)}
 - MA60：{fmt_number(context.ma60)}

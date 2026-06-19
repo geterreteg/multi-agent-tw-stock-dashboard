@@ -113,7 +113,11 @@ def build_request_spec(market: str, kind: str, query_date: str | None) -> dict[s
     if market == "TWSE":
         return {
             "url": TWSE_MARGIN_URL,
-            "params": {},
+            "params": {
+                "date": format_twse_date(query_date),
+                "selectType": "ALL",
+                "response": "json",
+            },
             "headers": {**MARGIN_HEADERS, "Referer": "https://www.twse.com.tw/zh/trading/margin/mi-margn.html"},
             "timeout": MARGIN_TIMEOUT_SECONDS,
         }

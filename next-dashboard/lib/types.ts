@@ -62,9 +62,14 @@ export type ChipDataGap = {
   source?: string;
 };
 
+export type ChipDataStatus = "current" | "latest_available" | "missing";
+export type ChipDataOverallStatus = ChipDataStatus | "partial";
+
 export type InstitutionalChipData = {
   symbol: string;
   asOfDate: string | null;
+  dataDate: string | null;
+  status: ChipDataStatus;
   foreignNetBuy: number | null;
   investmentTrustNetBuy: number | null;
   dealerNetBuy: number | null;
@@ -76,6 +81,8 @@ export type InstitutionalChipData = {
 export type MarginChipData = {
   symbol: string;
   asOfDate: string | null;
+  dataDate: string | null;
+  status: ChipDataStatus;
   marginBalance: number | null;
   marginChange: number | null;
   shortBalance: number | null;
@@ -87,6 +94,7 @@ export type MarginChipData = {
 };
 
 export type ChipData = {
+  overallStatus: ChipDataOverallStatus;
   institutional: InstitutionalChipData | null;
   margin: MarginChipData | null;
   dataGaps: ChipDataGap[];

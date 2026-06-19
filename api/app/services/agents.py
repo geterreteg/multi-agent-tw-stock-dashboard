@@ -164,14 +164,16 @@ def chip_agent(context) -> AgentInsight:
     risks: list[str] = []
     score = 0.0
     available = 0
+    institutional_weight = chip_status_weight(context.institutional_status)
+    margin_weight = chip_status_weight(context.margin_status)
 
     if context.foreign_buy is not None:
         available += 1
         if context.foreign_buy > 0:
-            score += 0.5
+            score += 0.5 * institutional_weight
             reasons.append(f"外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}，最近一日偏買方。")
         elif context.foreign_buy < 0:
-            score -= 0.5
+            score -= 0.5 * institutional_weight
             risks.append(f"外資買賣超 {fmt_number(context.foreign_buy, decimals=0)}，最近一日偏賣方。")
     else:
         risks.append("缺少外資買賣超，無法檢查外資方向。")
@@ -179,10 +181,10 @@ def chip_agent(context) -> AgentInsight:
     if context.institutional_net_buy is not None:
         available += 1
         if context.institutional_net_buy > 0:
-            score += 0.5
+            score += 0.5 * institutional_weight
             reasons.append(f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}，法人資金偏流入。")
         elif context.institutional_net_buy < 0:
-            score -= 0.5
+            score -= 0.5 * institutional_weight
             risks.append(f"三大法人合計 {fmt_number(context.institutional_net_buy, decimals=0)}，法人資金偏流出。")
     else:
         risks.append("缺少三大法人合計買賣超，資金面判斷降級。")
@@ -190,13 +192,18 @@ def chip_agent(context) -> AgentInsight:
     if context.margin_balance_change is not None:
         available += 1
         if context.margin_balance_change > 0 and context.latest_close is not None and context.ma20 is not None and context.latest_close < context.ma20:
-            score -= 0.75
+            score -= 0.75 * margin_weight
             risks.append("融資餘額增加且股價低於 MA20，信用籌碼承壓。")
         elif context.margin_balance_change < 0:
-            score += 0.25
+            score += 0.25 * margin_weight
             reasons.append(f"融資餘額變化 {fmt_number(context.margin_balance_change, decimals=0)}，槓桿籌碼壓力下降。")
     else:
         risks.append("缺少融資餘額變化，無法檢查信用交易壓力。")
+
+    if context.institutional_status == "latest_available":
+        reasons.append(f"法人資料使用最近可得交易日 {context.institutional_data_date}。")
+    if context.margin_status == "latest_available":
+        reasons.append(f"融資融券資料使用最近可得交易日 {context.margin_data_date}。")
 
     score = clamp_score(score)
     return AgentInsight(
@@ -212,12 +219,18 @@ def chip_agent(context) -> AgentInsight:
             f"{fmt_number(context.margin_balance_change, decimals=0)}。"
         ),
         evidence=[
+            f"法人資料來源：{context.institutional_source}",
+            f"法人資料狀態：{context.institutional_status}",
+            f"法人資料日期：{context.institutional_data_date or '資料暫無'}",
+            f"融資融券資料來源：{context.margin_source}",
+            f"融資融券資料狀態：{context.margin_status}",
+            f"融資融券資料日期：{context.margin_data_date or '資料暫無'}",
             f"外資買賣超：{fmt_number(context.foreign_buy, decimals=0)}",
             f"三大法人合計：{fmt_number(context.institutional_net_buy, decimals=0)}",
             f"融資餘額變化：{fmt_number(context.margin_balance_change, decimals=0)}",
             f"融券餘額變化：{fmt_number(context.short_balance_change, decimals=0)}",
         ],
-        degraded=available < 3,
+        degraded=available < 3 or context.institutional_status != "current" or context.margin_status != "current",
         reasons=reasons or ["可用籌碼資料未形成明確正向訊號。"],
         risks=risks or ["籌碼資料未顯示明確規則式風險。"],
     )
@@ -707,10 +720,18 @@ def score_catalysts(context) -> float:
     if context.latest_close is not None and context.ma60 is not None and context.latest_close > context.ma60:
         score += 3
     if context.foreign_buy is not None and context.foreign_buy > 0:
-        score += 2.5
+        score += 2.5 * chip_status_weight(context.institutional_status)
     if context.institutional_net_buy is not None and context.institutional_net_buy > 0:
-        score += 2.5
+        score += 2.5 * chip_status_weight(context.institutional_status)
     return min(score, 15)
+
+
+def chip_status_weight(status: str) -> float:
+    if status == "current":
+        return 1.0
+    if status == "latest_available":
+        return 0.75
+    return 0.0
 
 
 def score_risk_control(context, agents: list[AgentInsight], gaps: list[str]) -> float:
@@ -723,7 +744,7 @@ def score_risk_control(context, agents: list[AgentInsight], gaps: list[str]) -> 
     if context.pe_ratio is not None and context.pe_ratio > 40:
         score -= 3
     if context.margin_balance_change is not None and context.margin_balance_change > 0 and context.latest_close is not None and context.ma20 is not None and context.latest_close < context.ma20:
-        score -= 3
+        score -= 3 * chip_status_weight(context.margin_status)
     return max(0, round(score, 2))
 
 
