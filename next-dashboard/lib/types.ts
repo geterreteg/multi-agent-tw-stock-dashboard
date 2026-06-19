@@ -51,9 +51,30 @@ export type AgentInsight = {
 
 export type DebateMessage = {
   speaker: string;
+  role?: string;
   stance: Rating;
   message: string;
+  content?: string;
   tone: "support" | "risk" | "summary" | "neutral";
+  evidenceTags?: string[];
+};
+
+export type TargetPrice = {
+  currentPrice: number | null;
+  baseTargetPrice: number | null;
+  bearTargetPrice: number | null;
+  bullTargetPrice: number | null;
+  impliedUpsidePct: number | null;
+  valuationMethod: "RULE_BASED_PE_MULTIPLE" | "INSUFFICIENT_DATA";
+  epsBasis: "FORWARD" | "TTM" | "FOUR_QUARTERS" | "SINGLE_QUARTER" | "UNAVAILABLE";
+  epsUsed: number | null;
+  fairPERatio: number | null;
+  bearPERatio: number | null;
+  bullPERatio: number | null;
+  confidence: number;
+  assumptions: string[];
+  limitations: string[];
+  peSource: "EXTERNAL" | "DERIVED" | "UNAVAILABLE";
 };
 
 export type ChipDataGap = {
@@ -143,6 +164,7 @@ export type AnalyzeResponse = {
     message: string;
   }>;
   chipData?: ChipData;
+  targetPrice?: TargetPrice;
   reportMarkdown: string;
   disclaimer: string;
 };

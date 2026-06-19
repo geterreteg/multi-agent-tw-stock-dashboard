@@ -69,9 +69,30 @@ class AgentInsight(BaseModel):
 
 class DebateMessage(BaseModel):
     speaker: str
+    role: str = ""
     stance: Rating
     message: str
+    content: str = ""
     tone: Literal["support", "risk", "summary", "neutral"]
+    evidenceTags: list[str] = Field(default_factory=list)
+
+
+class TargetPrice(BaseModel):
+    currentPrice: Optional[int] = None
+    baseTargetPrice: Optional[int] = None
+    bearTargetPrice: Optional[int] = None
+    bullTargetPrice: Optional[int] = None
+    impliedUpsidePct: Optional[float] = None
+    valuationMethod: Literal["RULE_BASED_PE_MULTIPLE", "INSUFFICIENT_DATA"] = "INSUFFICIENT_DATA"
+    epsBasis: Literal["FORWARD", "TTM", "FOUR_QUARTERS", "SINGLE_QUARTER", "UNAVAILABLE"] = "UNAVAILABLE"
+    epsUsed: Optional[float] = None
+    fairPERatio: Optional[float] = None
+    bearPERatio: Optional[float] = None
+    bullPERatio: Optional[float] = None
+    confidence: int = Field(default=0, ge=0, le=65)
+    assumptions: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=lambda: ["資料不足，暫不產生正式 12M 目標價。"])
+    peSource: Literal["EXTERNAL", "DERIVED", "UNAVAILABLE"] = "UNAVAILABLE"
 
 
 class EquityResearchReport(BaseModel):
@@ -159,5 +180,6 @@ class AnalyzeResponse(BaseModel):
     decision: DecisionSummary
     sources: list[DataSourceStatus]
     chipData: ChipData = Field(default_factory=ChipData)
+    targetPrice: TargetPrice = Field(default_factory=TargetPrice)
     reportMarkdown: str
     disclaimer: str

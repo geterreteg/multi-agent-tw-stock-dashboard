@@ -14,6 +14,8 @@ from typing import Iterator, Optional
 import pandas as pd
 import requests
 
+from app.services.target_price import EpsEvidence
+
 try:
     import yfinance as yf
 except ImportError:  # pragma: no cover
@@ -494,17 +496,46 @@ def summarize_revenue(df: pd.DataFrame) -> tuple[Optional[float], Optional[float
     return latest_revenue, growth
 
 
-def summarize_financials(df: pd.DataFrame) -> Optional[float]:
+def summarize_financials(df: pd.DataFrame) -> EpsEvidence:
     if df.empty:
-        return None
+        return EpsEvidence("UNAVAILABLE", None, "FinMind financial statements")
     work = df.sort_values("date") if "date" in df.columns else df.copy()
     if "type" in work.columns and "value" in work.columns:
         type_text = work["type"].astype(str)
         eps_rows = work[type_text.str.contains("EPS|EarningsPerShare|BasicEarnings", case=False, na=False)]
-        eps = latest_numeric(eps_rows, ["value"])
-        if eps is not None:
-            return eps
-    return latest_numeric(work, ["EPS", "eps", "EarningsPerShare", "value"])
+        if not eps_rows.empty:
+            labels = eps_rows["type"].astype(str)
+            forward = eps_rows[labels.str.contains("forward", case=False, na=False)]
+            forward_value = latest_numeric(forward, ["value"])
+            if forward_value is not None:
+                return EpsEvidence("FORWARD", forward_value, "FinMind forward EPS")
+
+            ttm = eps_rows[labels.str.contains("TTM|trailing twelve|近十二", case=False, na=False)]
+            ttm_value = latest_numeric(ttm, ["value"])
+            if ttm_value is not None:
+                return EpsEvidence("TTM", ttm_value, "FinMind TTM EPS")
+
+            quarterly = eps_rows[labels.str.contains("Quarterly|single quarter|單季", case=False, na=False)].copy()
+            if "date" in quarterly.columns:
+                quarterly = quarterly.drop_duplicates(subset=["date"], keep="last").sort_values("date").tail(4)
+            quarterly_values = pd.to_numeric(quarterly.get("value", pd.Series(dtype=float)), errors="coerce").dropna()
+            if len(quarterly_values) == 4:
+                periods = tuple(quarterly["date"].astype(str).tolist()) if "date" in quarterly.columns else ()
+                return EpsEvidence("FOUR_QUARTERS", safe_float(quarterly_values.sum()), "FinMind quarterly EPS", periods)
+
+            latest_eps = latest_numeric(eps_rows, ["value"])
+            if latest_eps is not None:
+                return EpsEvidence("SINGLE_QUARTER", latest_eps, "FinMind latest reported EPS")
+
+    for column in ["forwardEPS", "forward_eps"]:
+        value = latest_numeric(work, [column])
+        if value is not None:
+            return EpsEvidence("FORWARD", value, f"FinMind {column}")
+    for column in ["ttmEPS", "trailingEPS", "ttm_eps"]:
+        value = latest_numeric(work, [column])
+        if value is not None:
+            return EpsEvidence("TTM", value, f"FinMind {column}")
+    return EpsEvidence("UNAVAILABLE", None, "FinMind financial statements")
 
 
 def summarize_institutional(df: pd.DataFrame) -> tuple[Optional[float], Optional[float]]:
@@ -592,7 +623,7 @@ def fetch_finmind_bundle(stock_id: str, token: str, token_mode: str) -> dict[str
         industry = str(row.get("industry_category", row.get("industry", industry)))
 
     latest_revenue, revenue_growth = summarize_revenue(frames["month_revenue"])
-    eps = summarize_financials(frames["financials"])
+    eps_summary = summarize_financials(frames["financials"])
     pe_ratio = latest_numeric(frames["per"], ["PER", "pe_ratio", "PE", "P_E_Ratio"])
     dividend_summary = summarize_dividend(frames["dividend"])
 
@@ -613,8 +644,12 @@ def fetch_finmind_bundle(stock_id: str, token: str, token_mode: str) -> dict[str
         "industry": industry,
         "latest_revenue": latest_revenue,
         "revenue_growth": revenue_growth,
-        "eps": eps,
+        "eps": eps_summary.value,
+        "eps_basis": eps_summary.basis,
+        "eps_source": eps_summary.source,
+        "eps_periods": list(eps_summary.periods),
         "pe_ratio": pe_ratio,
+        "pe_source": "EXTERNAL" if pe_ratio is not None and pe_ratio > 0 else "UNAVAILABLE",
         "foreign_buy": None,
         "institutional_net_buy": None,
         "margin_balance_change": None,

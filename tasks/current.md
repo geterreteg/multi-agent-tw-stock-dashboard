@@ -98,8 +98,11 @@ npm.cmd run build
 
 ## 目前待辦
 
-1. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
-2. 以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
+1. `codex/target-price-personal-tool-v1` 已完成第一版規則式 Target Price Engine、研究報告語氣、辯論室與 localStorage 決策筆記；尚未 merge、push 或部署 production。
+2. 目前 FinMind 財報一般 EPS 欄位只能保守辨識為單季 EPS。2330 實測因此回傳 `INSUFFICIENT_DATA`，未產生無法追溯的 12M 目標價。
+3. 未來若要提高估值覆蓋率，需加入可驗證的 forward / TTM EPS，或能明確區分單季與累計口徑的近四季 EPS；歷史 PE、同業 PE、DCF 與法人一致性預估仍未納入。
+4. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
+5. 以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
 
 ## 不能亂改的地方
 
@@ -109,5 +112,6 @@ npm.cmd run build
 - 不使用 CSV 當作正式基本面或外資買賣超來源。
 - 投資評分、資料狀態、日期 fallback、資料來源與報告免責聲明屬正確性關鍵邏輯，修改前需追蹤完整資料流並使用測試驗證。
 - 不要為了一個頁面或單一資料問題重構無關檔案、頁面、API、部署或設計系統。
+- `targetPrice` 只作為規則式估值參考，不得單獨加入 Agent 分數或主導最終評級；`INSUFFICIENT_DATA` 不得硬補目標價。
 - 不能批量刪除檔案或目錄；需刪除時只能一次處理一個明確檔案。
 - 正式文件修訂需遵守 `AGENTS.md` 的保留原文與變更標記規則。

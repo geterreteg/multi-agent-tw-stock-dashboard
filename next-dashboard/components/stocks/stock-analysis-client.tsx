@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, Download, FileText, GaugeCircle, Lightbulb, Loader2, MessageSquareText, Scale, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, Download, FileText, GaugeCircle, Lightbulb, Loader2, MessageSquareText, NotebookPen, Scale, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { StockCharts } from "@/components/charts/stock-charts";
+import { DebateRoom } from "@/components/stocks/debate-room";
+import { DecisionNotes } from "@/components/stocks/decision-notes";
+import { TargetPricePanel } from "@/components/stocks/target-price-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { analyzeStock } from "@/lib/api";
+import { targetPriceSummary } from "@/lib/target-price";
 import type { AnalyzeResponse } from "@/lib/types";
 
 const COURSE_RESEARCH_DISCLAIMER =
@@ -32,7 +36,7 @@ type ResearchReportView = {
   scoreBreakdown: Record<string, number>;
 };
 
-type ResearchTabId = "summary" | "technical" | "fundamental" | "risk" | "conclusion";
+type ResearchTabId = "summary" | "technical" | "fundamental" | "risk" | "conclusion" | "debate" | "notes";
 
 type ResearchTabGroup = {
   title: string;
@@ -245,10 +249,11 @@ function ResearchHeader({
           <p className="mt-4 text-xs leading-6 text-[#746b60]">來源狀態：{formatSourceNames(sources, hasFinMindPublicMode)}</p>
         </aside>
       </div>
-      <div className="grid gap-3 border-t border-[#e8e0d5] bg-[#fbf7ef] p-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 border-t border-[#e8e0d5] bg-[#fbf7ef] p-3 sm:grid-cols-2 xl:grid-cols-6">
         <QuoteStripItem label="綜合分數" value={formatScore(finalScore)} />
         <QuoteStripItem label="最新收盤" value={formatPlainMetric(data.metrics.latestClose)} />
         <QuoteStripItem label="20 日報酬" value={formatSignedMetric(data.metrics.return20d, "%")} />
+        <QuoteStripItem label="12M 規則式目標價" value={targetPriceSummary(data.targetPrice)} />
         <QuoteStripItem label="資料品質" value={dataQualityLabel} tone={dataQualityTone} />
         <QuoteStripItem label="來源狀態" value={formatSourceNames(sources, hasFinMindPublicMode)} tone={dataQualityTone} />
       </div>
@@ -529,6 +534,20 @@ function buildResearchTabs(data: AnalyzeResponse, report: ResearchReportView): R
         { title: "免責聲明", items: [COURSE_RESEARCH_DISCLAIMER, data.disclaimer] },
       ],
     },
+    {
+      id: "debate",
+      label: "辯論室",
+      description: "以投資委員會聊天室呈現估值、多方、反方、風控與主持人共識。",
+      icon: MessageSquareText,
+      groups: [],
+    },
+    {
+      id: "notes",
+      label: "決策筆記",
+      description: "把個人動作、投資假說、停損與看錯條件保存在此瀏覽器。",
+      icon: NotebookPen,
+      groups: [],
+    },
   ];
 }
 
@@ -538,6 +557,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
   const activePanel = reportTabs.find((tab) => tab.id === activeTab) ?? reportTabs[0];
   const ActiveIcon = activePanel.icon;
   const isRiskPanel = activePanel.id === "risk";
+  const isCustomPanel = activePanel.id === "debate" || activePanel.id === "notes";
   const leftPanelGroups = isRiskPanel ? activePanel.groups.filter((group) => group.title === "官方資料缺口") : [];
   const mainPanelGroups = isRiskPanel ? activePanel.groups.filter((group) => group.title !== "官方資料缺口") : activePanel.groups;
   const summaryPanel = <TabSummaryPanel panel={activePanel} icon={ActiveIcon} extraGroups={leftPanelGroups} />;
@@ -574,7 +594,11 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             </div>
           </div>
 
-          {activePanel.showCharts ? (
+          {isCustomPanel ? (
+            <div className="p-5 lg:p-6">
+              {activePanel.id === "debate" ? <DebateRoom messages={data.debate ?? []} /> : <DecisionNotes symbol={data.symbol} />}
+            </div>
+          ) : activePanel.showCharts ? (
             <div className="grid gap-5 p-5 lg:p-6">
               <StockCharts data={data} summary={summaryPanel} />
               <TabDetailsDisclosure groups={activePanel.groups} label="查看技術面文字摘要" />
@@ -583,6 +607,7 @@ function StructuredResearchReport({ data, report }: { data: AnalyzeResponse; rep
             <div className="grid gap-5 p-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start lg:p-6">
               {summaryPanel}
               <div className={`min-w-0 grid gap-4 ${isRiskPanel ? "md:grid-cols-2 xl:grid-cols-2" : "md:grid-cols-2"}`}>
+                {activePanel.id === "fundamental" ? <TargetPricePanel targetPrice={data.targetPrice} /> : null}
                 {activePanel.showCharts ? (
                   <div className="md:col-span-2">
                     <StockCharts data={data} />

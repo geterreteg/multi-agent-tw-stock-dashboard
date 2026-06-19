@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Optional
 
@@ -19,6 +19,7 @@ from app.models import (
     MetricSnapshot,
     MovingAveragePoint,
     PricePoint,
+    TargetPrice,
     VolumePoint,
 )
 from app.services.institutional_data import get_institutional_data
@@ -34,8 +35,9 @@ from app.services.market_data import (
     safe_float,
     safe_int,
 )
-from app.services.agents import run_agents
+from app.services.agents import build_investment_committee_debate, run_agents
 from app.services.reports import generate_markdown_report
+from app.services.target_price import EpsEvidence, build_target_price
 
 
 DISCLAIMER = "本系統分析結果僅供學術研究與投資參考，不構成任何買賣建議。投資人仍應自行評估風險並承擔投資結果。"
@@ -57,7 +59,11 @@ class StockContext:
     revenue_growth: Optional[float] = None
     latest_revenue: Optional[float] = None
     eps: Optional[float] = None
+    eps_basis: str = "UNAVAILABLE"
+    eps_source: str = "FinMind financial statements"
+    eps_periods: tuple[str, ...] = ()
     pe_ratio: Optional[float] = None
+    pe_source: str = "UNAVAILABLE"
     foreign_buy: Optional[float] = None
     institutional_net_buy: Optional[float] = None
     margin_balance_change: Optional[float] = None
@@ -99,7 +105,11 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
         latest_revenue=safe_float(finmind["latest_revenue"]),
         revenue_growth=safe_float(finmind["revenue_growth"]),
         eps=safe_float(finmind["eps"]),
+        eps_basis=str(finmind.get("eps_basis", "UNAVAILABLE")),
+        eps_source=str(finmind.get("eps_source", "FinMind financial statements")),
+        eps_periods=tuple(str(item) for item in finmind.get("eps_periods", [])),
         pe_ratio=safe_float(finmind["pe_ratio"]),
+        pe_source=str(finmind.get("pe_source", "UNAVAILABLE")),
         foreign_buy=safe_float(chip_metrics["foreign_buy"]),
         institutional_net_buy=safe_float(chip_metrics["institutional_net_buy"]),
         margin_balance_change=safe_float(chip_metrics["margin_balance_change"]),
@@ -124,8 +134,34 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
     except Exception as exc:
         return build_failed_response(symbol, period, f"資料服務發生未預期錯誤：{type(exc).__name__}")
 
-    agents, debate, decision, rating = run_agents(context)
-    report = generate_markdown_report(context, agents, rating, decision, debate)
+    agents, _, decision, rating = run_agents(context)
+    target_price_result = build_target_price(
+        current_price=context.latest_close,
+        eps=EpsEvidence(
+            basis=context.eps_basis,
+            value=context.eps,
+            source=context.eps_source,
+            periods=context.eps_periods,
+        ),
+        current_pe=context.pe_ratio,
+        pe_source=context.pe_source,
+        has_valuation_gaps=bool(context.finmind_errors),
+    )
+    debate = build_investment_committee_debate(
+        context=context,
+        agents=agents,
+        rating=rating,
+        research=decision.researchReport,
+        target_price=target_price_result,
+    )
+    report = generate_markdown_report(
+        context,
+        agents,
+        rating,
+        decision,
+        debate,
+        target_price=target_price_result,
+    )
 
     return AnalyzeResponse(
         symbol=context.stock_id,
@@ -149,6 +185,7 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
         decision=decision,
         sources=[source_to_api_status(status) for status in context.source_status],
         chipData=chip_data_to_model(context.chip_data),
+        targetPrice=TargetPrice(**asdict(target_price_result)),
         reportMarkdown=report,
         disclaimer=DISCLAIMER,
     )
@@ -328,6 +365,12 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
         scoreBreakdown=research_report.scoreBreakdown,
         researchReport=research_report,
     )
+    target_price = build_target_price(
+        current_price=None,
+        eps=EpsEvidence("UNAVAILABLE", None, "資料服務失敗"),
+        current_pe=None,
+        pe_source="UNAVAILABLE",
+    )
     return AnalyzeResponse(
         symbol=normalized,
         name=f"{normalized}.TW",
@@ -355,6 +398,7 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
         decision=decision,
         sources=[DataSourceStatus(name="FastAPI", status="failed", message=message)],
         chipData=chip_data_to_model(chip_data),
+        targetPrice=TargetPrice(**asdict(target_price)),
         reportMarkdown=f"# {normalized} 分析暫停\n\n{message}\n\n{DISCLAIMER}",
         disclaimer=DISCLAIMER,
     )
