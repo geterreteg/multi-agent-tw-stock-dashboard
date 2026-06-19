@@ -1,5 +1,30 @@
 # 專案交接紀錄
 
+## 2026-06-19 Production End-to-End 驗收完成
+
+- Vercel `multi-agent-tw-stock-dashboard-next` 於 17:36 完成 Ready production deployment，正式 URL 為 `https://multi-agent-tw-stock-dashboard-next.vercel.app`。
+- 股票頁 bundle 由 `page-4238a3a731d4ebaf.js` 更新為 `page-0d0c11fd5317020c.js`，編譯的 API origin 已是 `https://multi-agent-stock-api.onrender.com`。
+- 2330 正式頁面：籌碼總體為「最近可得官方資料」，官方資料缺口為 0；法人日期 2026-06-17，融資融券日期 2026-06-18。
+- 8299 正式頁面：籌碼總體為「最近可得官方資料」，官方資料缺口為 0；法人與融資融券日期均為 2026-06-18。
+- 原「官方資料缺失 / 日期未提供」問題已在正式資料流中解決；本次無需修改 repo 程式碼。
+
+## 2026-06-19 Render Production Redeploy 驗證
+
+- `https://multi-agent-stock-api.onrender.com/api/health` 回傳 status=`ok`、service=`multi-agent-stock-api`、version=`0.1.0`。
+- 2330：institutional=`latest_available` / `2026-06-17` / `TWSE 三大法人買賣超日報`，margin=`latest_available` / `2026-06-18` / `TWSE 融資融券餘額`，overallStatus=`latest_available`，dataGaps=0。
+- 8299：institutional=`latest_available` / `2026-06-18` / `TPEx 三大法人買賣明細`，margin=`latest_available` / `2026-06-18` / `TPEx 融資融券餘額`，overallStatus=`latest_available`，dataGaps=0。
+- Render production 已部署新版 FastAPI，無需修改 repo 程式碼。
+- 下一步是將 Vercel `multi-agent-tw-stock-dashboard-next` Production 的 `NEXT_PUBLIC_API_BASE_URL` 設為 `https://multi-agent-stock-api.onrender.com`，重新部署後進行正式網頁驗收。
+
+## 2026-06-19 Production Backend 定位
+
+- Render production FastAPI 服務名稱是 `multi-agent-stock-api`，origin 是 `https://multi-agent-stock-api.onrender.com`；另有 `multi-agent-stock-api-staging`。
+- 兩個服務 `/api/health` 皆回傳 200、service=`multi-agent-stock-api`、version=`0.1.0`。
+- Production `/api/analyze` 的 2330 / 8299 response 完全沒有 top-level `chipData`；staging 虽有 `chipData`，但缺少 `status` / `dataDate` / `overallStatus`。兩者均非 `f593ffc` 的新版 FastAPI。
+- Render Dashboard 需要登入，本次未嘗試登入或觸發 redeploy。使用者需在 `multi-agent-stock-api` 確認 branch=`main`、root directory=`api`，然後執行 Deploy latest commit。
+- `NEXT_PUBLIC_API_BASE_URL` 必須設為 backend origin `https://multi-agent-stock-api.onrender.com`，不可包含 `/api/analyze`，因為 `next-dashboard/lib/api.ts` 會自行附加 `/api/analyze` 與 `/api/health`。
+- Vercel production alias 於 2026-06-19 17:01 有新 Ready deployment，但股票頁仍引用原 bundle hash，API base 未改；這次 redeploy 尚未修復資料流。
+
 ## 2026-06-19 新版 Production 驗證
 
 - `main` 已在 `f593ffc` 整合籌碼修正；`multi-agent-tw-stock-dashboard-next` 已將該 commit 部署為 Ready production，正式驗收 URL 應使用 `https://multi-agent-tw-stock-dashboard-next.vercel.app`。

@@ -34,7 +34,8 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 - 根目錄 `render.yaml` 定義 Streamlit Render Web Service，啟動指令為 `python -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0`。
 - `api/render.yaml` 定義 FastAPI Render Web Service，啟動指令為 `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`。
 - 新版正式前端為 `https://multi-agent-tw-stock-dashboard-next.vercel.app`，production deployment 對應 `f593ffc` 且狀態為 Ready。舊 `https://multi-agent-tw-stock-dashboard-live.vercel.app` 仍為 `c78f149` 舊版，不用於新版籌碼驗收。
-- 新版正式前端已編譯 bundle 的 API base 仍為 `https://multi-agent-stock-api-staging.onrender.com`。該 backend 仍回傳舊版 `chipData` 契約，2330 / 8299 均缺少 `status` / `dataDate` / `overallStatus`。
+- Render FastAPI production 服務為 `multi-agent-stock-api`，origin 為 `https://multi-agent-stock-api.onrender.com`。2026-06-19 redeploy 後 `/api/health` 為 200 / `0.1.0`；2330 與 8299 皆已回傳完整新版 `chipData`、`overallStatus=latest_available`且 `dataGaps=0`。
+- `multi-agent-tw-stock-dashboard-next` 於 2026-06-19 17:36 完成 Ready production deployment，新 bundle 已編譯 `https://multi-agent-stock-api.onrender.com`。2330 / 8299 正式頁面皆已顯示「最近可得官方資料」，官方資料缺口為 0。
 
 ## 資料來源與外部服務限制
 
@@ -56,7 +57,7 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 
 ## 目前已知限制
 
-- 目前分支為 `main`，HEAD `f593ffc`。新版 Vercel 前端已部署，但 production API base 仍指向舊 Render staging backend，而該 backend 尚未部署新版 FastAPI 契約。
+- 目前 `main` 已包含 `f593ffc` 與後續文件提交。Render production FastAPI 與 Vercel Production API base 皆已升級，2330 / 8299 正式資料流驗收通過。
 - TWSE 融資 parser 已支援 `代號` / `股票代號` / `證券代號`；2330 真實官方 API smoke test 已確認 margin 不再誤判為 `missing`。
 - `chipData.overallStatus` 已由後端依 institutional / margin 狀態合併為 `current` / `latest_available` / `partial` / `missing`，前端直接顯示該欄位。
 - 風險控管的融資壓力扣分已套用 `current=1.0` / `latest_available=0.75` / `missing=0.0` 狀態權重。
@@ -97,10 +98,8 @@ npm.cmd run build
 
 ## 目前待辦
 
-1. 將 `f593ffc` 或後續 `main` 部署到正式 FastAPI backend，確認 2330 / 8299 回傳新版 `chipData` 契約。
-2. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
-3. 將 Vercel `multi-agent-tw-stock-dashboard-next` Production 的 `NEXT_PUBLIC_API_BASE_URL` 改為新版正式 FastAPI origin，重新部署後再驗證 request URL。
-4. 在資料流程穩定後，再以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
+1. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
+2. 以正式文件規則更新 README、DEPLOYMENT、PRODUCT_PLAN 與必要的專案規則。
 
 ## 不能亂改的地方
 
