@@ -9,6 +9,7 @@ __pycache__/
 .venv/
 venv/
 api/.env
+api/.cache/
 next-dashboard/.env.local
 next-dashboard/.next/
 next-dashboard/node_modules/

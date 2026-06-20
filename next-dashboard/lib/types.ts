@@ -66,7 +66,7 @@ export type TargetPrice = {
   bullTargetPrice: number | null;
   impliedUpsidePct: number | null;
   valuationMethod: "RULE_BASED_PE_MULTIPLE" | "INSUFFICIENT_DATA";
-  epsBasis: "FORWARD" | "TTM" | "FOUR_QUARTERS" | "SINGLE_QUARTER" | "UNAVAILABLE";
+  epsBasis: "FORWARD" | "TTM" | "TTM_EPS" | "FOUR_QUARTERS" | "SINGLE_QUARTER" | "UNAVAILABLE";
   epsUsed: number | null;
   fairPERatio: number | null;
   bearPERatio: number | null;
@@ -74,7 +74,19 @@ export type TargetPrice = {
   confidence: number;
   assumptions: string[];
   limitations: string[];
-  peSource: "EXTERNAL" | "DERIVED" | "UNAVAILABLE";
+  peSource: "HISTORICAL_TWSE" | "EXTERNAL" | "DERIVED" | "UNAVAILABLE";
+};
+
+export type HistoricalPE = {
+  minPE: number | null;
+  p25PE: number | null;
+  medianPE: number | null;
+  p75PE: number | null;
+  maxPE: number | null;
+  validSampleCount: number;
+  source: string;
+  cacheStatus: "live" | "cache" | "missing";
+  dataLimitations: string[];
 };
 
 export type ChipDataGap = {
@@ -164,7 +176,8 @@ export type AnalyzeResponse = {
     message: string;
   }>;
   chipData?: ChipData;
-  targetPrice?: TargetPrice;
+  targetPrice: TargetPrice;
+  historicalPE: HistoricalPE;
   reportMarkdown: string;
   disclaimer: string;
 };

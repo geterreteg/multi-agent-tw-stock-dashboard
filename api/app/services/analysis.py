@@ -15,6 +15,7 @@ from app.models import (
     DecisionSummary,
     EquityResearchReport,
     InstitutionalData,
+    HistoricalPE,
     MarginData,
     MetricSnapshot,
     MovingAveragePoint,
@@ -24,6 +25,7 @@ from app.models import (
 )
 from app.services.institutional_data import get_institutional_data
 from app.services.margin_data import get_margin_data
+from app.services.pe_history import HistoricalPEResult, empty_historical_pe, get_historical_pe
 from app.services.market_data import (
     SourceStatus,
     TPEX_SOURCE,
@@ -79,6 +81,7 @@ class StockContext:
     margin_status: str = "missing"
     margin_data_date: Optional[str] = None
     margin_source: str = "官方融資融券資料"
+    historical_pe: HistoricalPEResult = field(default_factory=lambda: empty_historical_pe(""))
 
 
 def build_context(symbol: str, period: str = "6mo") -> StockContext:
@@ -90,6 +93,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
     market = infer_market_from_price_status(price_status)
     chip_data = build_chip_data(stock_id, market)
     chip_metrics = chip_metrics_from_data(chip_data)
+    historical_pe = get_historical_pe_best_effort(stock_id, market)
 
     return StockContext(
         stock_id=stock_id,
@@ -125,6 +129,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
         margin_status=str(chip_metrics["margin_status"]),
         margin_data_date=chip_metrics["margin_data_date"],
         margin_source=str(chip_metrics["margin_source"]),
+        historical_pe=historical_pe,
     )
 
 
@@ -146,6 +151,7 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
         current_pe=context.pe_ratio,
         pe_source=context.pe_source,
         has_valuation_gaps=bool(context.finmind_errors),
+        historical_pe=context.historical_pe,
     )
     debate = build_investment_committee_debate(
         context=context,
@@ -186,6 +192,7 @@ def analyze_symbol(symbol: str, period: str) -> AnalyzeResponse:
         sources=[source_to_api_status(status) for status in context.source_status],
         chipData=chip_data_to_model(context.chip_data),
         targetPrice=TargetPrice(**asdict(target_price_result)),
+        historicalPE=historical_pe_to_model(context.historical_pe),
         reportMarkdown=report,
         disclaimer=DISCLAIMER,
     )
@@ -330,6 +337,23 @@ def chip_data_to_model(chip_data: dict) -> ChipData:
     )
 
 
+def get_historical_pe_best_effort(symbol: str, market: str | None) -> HistoricalPEResult:
+    try:
+        return get_historical_pe(symbol, market=market)
+    except Exception as exc:
+        return empty_historical_pe(
+            symbol,
+            [f"歷史 PE 發生非預期錯誤（{type(exc).__name__}），已略過且不影響主分析。"],
+        )
+
+
+def historical_pe_to_model(result: HistoricalPEResult) -> HistoricalPE:
+    payload = asdict(result)
+    payload.pop("symbol", None)
+    payload.pop("samples", None)
+    return HistoricalPE(**payload)
+
+
 def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResponse:
     normalized = symbol.strip() or "UNKNOWN"
     chip_data = build_chip_data(normalized, None)
@@ -399,6 +423,7 @@ def build_failed_response(symbol: str, period: str, message: str) -> AnalyzeResp
         sources=[DataSourceStatus(name="FastAPI", status="failed", message=message)],
         chipData=chip_data_to_model(chip_data),
         targetPrice=TargetPrice(**asdict(target_price)),
+        historicalPE=historical_pe_to_model(empty_historical_pe(normalized, ["分析資料服務失敗，未取得歷史 PE。"])),
         reportMarkdown=f"# {normalized} 分析暫停\n\n{message}\n\n{DISCLAIMER}",
         disclaimer=DISCLAIMER,
     )

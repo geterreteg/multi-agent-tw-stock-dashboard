@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 Rating = Literal["Strong Buy / 強烈看多", "Buy / 看多", "Neutral / 中性", "Sell / 看空", "Strong Sell / 強烈看空"]
@@ -78,21 +78,37 @@ class DebateMessage(BaseModel):
 
 
 class TargetPrice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     currentPrice: Optional[int] = None
     baseTargetPrice: Optional[int] = None
     bearTargetPrice: Optional[int] = None
     bullTargetPrice: Optional[int] = None
     impliedUpsidePct: Optional[float] = None
     valuationMethod: Literal["RULE_BASED_PE_MULTIPLE", "INSUFFICIENT_DATA"] = "INSUFFICIENT_DATA"
-    epsBasis: Literal["FORWARD", "TTM", "FOUR_QUARTERS", "SINGLE_QUARTER", "UNAVAILABLE"] = "UNAVAILABLE"
+    epsBasis: Literal["FORWARD", "TTM", "TTM_EPS", "FOUR_QUARTERS", "SINGLE_QUARTER", "UNAVAILABLE"] = "UNAVAILABLE"
     epsUsed: Optional[float] = None
     fairPERatio: Optional[float] = None
     bearPERatio: Optional[float] = None
     bullPERatio: Optional[float] = None
     confidence: int = Field(default=0, ge=0, le=65)
     assumptions: list[str] = Field(default_factory=list)
-    limitations: list[str] = Field(default_factory=lambda: ["資料不足，暫不產生正式 12M 目標價。"])
-    peSource: Literal["EXTERNAL", "DERIVED", "UNAVAILABLE"] = "UNAVAILABLE"
+    limitations: list[str] = Field(default_factory=lambda: ["資料不足，暫不產生規則式估值區間。"])
+    peSource: Literal["HISTORICAL_TWSE", "EXTERNAL", "DERIVED", "UNAVAILABLE"] = "UNAVAILABLE"
+
+
+class HistoricalPE(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    minPE: Optional[float] = None
+    p25PE: Optional[float] = None
+    medianPE: Optional[float] = None
+    p75PE: Optional[float] = None
+    maxPE: Optional[float] = None
+    validSampleCount: int = 0
+    source: str = "TWSE 個股日本益比、殖利率及股價淨值比"
+    cacheStatus: Literal["live", "cache", "missing"] = "missing"
+    dataLimitations: list[str] = Field(default_factory=list)
 
 
 class EquityResearchReport(BaseModel):
@@ -168,6 +184,8 @@ class ChipData(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     symbol: str
     name: str
     period: str
@@ -181,5 +199,6 @@ class AnalyzeResponse(BaseModel):
     sources: list[DataSourceStatus]
     chipData: ChipData = Field(default_factory=ChipData)
     targetPrice: TargetPrice = Field(default_factory=TargetPrice)
+    historicalPE: HistoricalPE = Field(default_factory=HistoricalPE)
     reportMarkdown: str
     disclaimer: str
