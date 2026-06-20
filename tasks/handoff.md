@@ -7,7 +7,8 @@
 - 已完成月份的明確「沒有符合條件 / 查無資料」回應可負向快取；暫時性或矛盾的 TWSE 錯誤不寫 cache。cache 寫入失敗、單月失敗或整體 timeout 都只加入 `dataLimitations`，不影響主分析 HTTP 200。
 - 本機冷啟動 2330：HTTP 200 / 7.15 秒，36 筆；2317：HTTP 200 / 4.80 秒，36 筆；8299：HTTP 200 / 5.41 秒，0 筆、`missing`，明確說明第一版不支援 TPEx。cache 建立後 2330 / 2317 都以 `cacheStatus=cache` 回 36 筆。
 - 2330 / 2317 的 EPS basis 都是 `SINGLE_QUARTER`，因此即使歷史 PE 有 36 筆，Bear / Base / Bull 仍為 null；API case-sensitive key 僅有 top-level `historicalPE`。
-- 驗證：FastAPI unittest 50/50、Python compileall、TypeScript、Next.js production build、`git diff --check` 通過。Render production 部署與遠端 E2E 待本次變更合併後執行。
+- 驗證：FastAPI unittest 50/50、Python compileall、TypeScript、Next.js production build、`git diff --check` 通過。PR #3 已合併並部署；穩定後 Render production 的 2330 / 2317 / 8299 分別在 16.27 / 16.40 / 15.49 秒回 HTTP 200，沒有 30 秒 canceled。
+- 遠端驗收當下 Render 到 TWSE 全部失敗，2330 / 2317 因此為 `missing` / 0 筆，但 `dataLimitations` 明確包含 6 秒 live 上限、36 個月份樣本不足與主分析可繼續；8299 明確標示第一版不支援 TPEx。正式前端 2330 / 8299 的「基本面 / 估值」頁皆顯示對應降級原因，console 無 warning/error。
 
 ## 2026-06-20 PR #2 Preview API routing 診斷
 
