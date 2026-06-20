@@ -6,7 +6,7 @@ import json
 import math
 import threading
 import time
-from dataclasses import asdict, dataclass, replace
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -38,50 +38,72 @@ class HistoricalPEResult:
     samples: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class _MonthSampleOutcome:
+    sample: Optional[dict[str, Any]]
+    used_live: bool = False
+    cache_write_failed: bool = False
+
+
 def get_historical_pe(
     symbol: str,
     market: str | None,
     reference_date: date | None = None,
     months: int = 36,
-    cache_path: Path | None = None,
+    cache_dir: Path | None = None,
     request_json: RequestJson | None = None,
     overall_timeout_seconds: float = OVERALL_TIMEOUT_SECONDS,
     max_workers: int = MAX_WORKERS,
 ) -> HistoricalPEResult:
     stock_id = _normalize_symbol(symbol)
-    resolved_cache_path = cache_path or DEFAULT_CACHE_DIR / f"{stock_id}.json"
+    resolved_cache_dir = cache_dir or DEFAULT_CACHE_DIR
     if str(market or "").strip().upper() != "TWSE":
         return empty_historical_pe(stock_id, ["第一版歷史 PE 僅支援 TWSE 上市股票，尚不支援 TPEx。"])
-
-    cached = _read_cache(resolved_cache_path, stock_id)
-    if cached is not None:
-        return replace(
-            cached,
-            cacheStatus="cache",
-            dataLimitations=[*cached.dataLimitations, "本次優先使用有效歷史 PE JSON 快取，未同步重抓 TWSE。"],
-        )
 
     requester = request_json or _build_twse_requester()
     samples: list[dict[str, Any]] = []
     month_ends = _recent_completed_month_ends(reference_date or date.today(), months)
+    unresolved_month_ends: list[date] = []
+    for month_end in month_ends:
+        cached_sample = _find_cached_month_end_sample(stock_id, month_end, resolved_cache_dir)
+        if cached_sample is None:
+            unresolved_month_ends.append(month_end)
+        else:
+            samples.append(cached_sample)
+
     deadline = time.monotonic() + max(0, overall_timeout_seconds)
     timed_out = False
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(month_ends) or 1)))
-    futures: dict[concurrent.futures.Future[Optional[dict[str, Any]]], date] = {}
+    executor: concurrent.futures.ThreadPoolExecutor | None = None
+    futures: dict[concurrent.futures.Future[_MonthSampleOutcome], date] = {}
+    used_live = False
+    cache_write_failed = False
     try:
-        futures = {
-            executor.submit(_fetch_month_end_sample, stock_id, month_end, requester, deadline): month_end
-            for month_end in month_ends
-        }
-        done, not_done = concurrent.futures.wait(futures, timeout=max(0, overall_timeout_seconds))
+        if unresolved_month_ends:
+            executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=max(1, min(max_workers, len(unresolved_month_ends)))
+            )
+            futures = {
+                executor.submit(
+                    _fetch_month_end_sample,
+                    stock_id,
+                    month_end,
+                    resolved_cache_dir,
+                    requester,
+                    deadline,
+                ): month_end
+                for month_end in unresolved_month_ends
+            }
+        done, not_done = concurrent.futures.wait(futures, timeout=max(0, overall_timeout_seconds)) if futures else (set(), set())
         timed_out = bool(not_done)
         for future in done:
             try:
-                sample = future.result()
+                outcome = future.result()
             except Exception:
-                sample = None
-            if sample is not None:
-                samples.append(sample)
+                outcome = _MonthSampleOutcome(None)
+            used_live = used_live or outcome.used_live
+            cache_write_failed = cache_write_failed or outcome.cache_write_failed
+            if outcome.sample is not None:
+                samples.append(outcome.sample)
         for future in not_done:
             future.cancel()
     except Exception as exc:
@@ -90,7 +112,8 @@ def get_historical_pe(
             [f"TWSE 歷史 PE best-effort 讀取失敗（{type(exc).__name__}），且無可用快取；不影響主分析。"],
         )
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
+        if executor is not None:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     result = summarize_pe_samples(stock_id, samples)
     limitations = [
@@ -102,15 +125,15 @@ def get_historical_pe(
         limitations.append(f"{missing_months} 個月份在月末往前 10 天內無可用 PE 樣本。")
     if timed_out:
         limitations.append(f"TWSE live 抓取已達 {overall_timeout_seconds:g} 秒整體時間上限，未完成月份視為 missing；不影響主分析。")
+    if cache_write_failed:
+        limitations.append("歷史 PE cache 寫入失敗；不影響本次主分析。")
     if result.validSampleCount == 0:
         limitations.append("TWSE live 抓取未取得可用歷史 PE，且無有效快取；主分析仍可繼續。")
-    result = replace(result, dataLimitations=limitations)
-    if result.validSampleCount > 0:
-        try:
-            _write_cache(resolved_cache_path, result)
-        except OSError:
-            result = replace(result, dataLimitations=[*result.dataLimitations, "歷史 PE cache 寫入失敗；不影響本次主分析。"])
-    return result
+    cache_status = "live" if result.validSampleCount > 0 and used_live else result.cacheStatus
+    if result.validSampleCount > 0 and not used_live:
+        cache_status = "cache"
+        limitations.append("本次歷史 PE 樣本皆由 TWSE 每日全市場快取取得，未同步重抓已快取日期。")
+    return replace(result, cacheStatus=cache_status, dataLimitations=limitations)
 
 
 def parse_pe(value: Any) -> Optional[float]:
@@ -171,33 +194,74 @@ def empty_historical_pe(symbol: str, limitations: list[str] | None = None) -> Hi
 def _fetch_month_end_sample(
     symbol: str,
     month_end: date,
+    cache_dir: Path,
     request_json: RequestJson,
     deadline: float = math.inf,
-) -> Optional[dict[str, Any]]:
+) -> _MonthSampleOutcome:
+    cache_write_failed = False
     for days_back in range(11):
-        if time.monotonic() >= deadline:
-            return None
         query_date = month_end - timedelta(days=days_back)
-        payload = request_json(query_date.strftime("%Y%m%d"))
+        query_date_text = query_date.strftime("%Y%m%d")
+        cache_path = cache_dir / "daily" / f"{query_date_text}.json"
+        payload = _read_daily_cache(cache_path, query_date_text)
+        payload_from_live = False
+        if payload is None:
+            if time.monotonic() >= deadline:
+                return _MonthSampleOutcome(None, False, cache_write_failed)
+            try:
+                payload = request_json(query_date_text)
+            except Exception:
+                continue
+            payload_from_live = True
+            if _is_cacheable_daily_payload(payload):
+                try:
+                    _write_daily_cache(cache_path, query_date_text, payload)
+                except OSError:
+                    cache_write_failed = True
         if str(payload.get("stat", "")).upper() != "OK":
             continue
-        data_date = _parse_twse_date(payload.get("date")) or query_date
-        if data_date > month_end or data_date < month_end - timedelta(days=10):
+        sample = _sample_from_payload(symbol, month_end, query_date, payload)
+        if sample is not None:
+            return _MonthSampleOutcome(sample, payload_from_live, cache_write_failed)
+    return _MonthSampleOutcome(None, False, cache_write_failed)
+
+
+def _find_cached_month_end_sample(symbol: str, month_end: date, cache_dir: Path) -> Optional[dict[str, Any]]:
+    for days_back in range(11):
+        query_date = month_end - timedelta(days=days_back)
+        query_date_text = query_date.strftime("%Y%m%d")
+        payload = _read_daily_cache(cache_dir / "daily" / f"{query_date_text}.json", query_date_text)
+        if payload is None or str(payload.get("stat", "")).upper() != "OK":
             continue
-        fields = [str(field).strip() for field in payload.get("fields") or []]
-        try:
-            symbol_index = fields.index("證券代號")
-            pe_index = fields.index("本益比")
-        except ValueError:
-            raise ValueError("TWSE PE payload fields changed")
-        for row in payload.get("data") or []:
-            if not isinstance(row, list) or symbol_index >= len(row):
-                continue
-            if _normalize_symbol(row[symbol_index]) != symbol:
-                continue
-            pe = parse_pe(row[pe_index] if pe_index < len(row) else None)
-            if pe is not None:
-                return {"date": data_date.isoformat(), "pe": pe}
+        sample = _sample_from_payload(symbol, month_end, query_date, payload)
+        if sample is not None:
+            return sample
+    return None
+
+
+def _sample_from_payload(
+    symbol: str,
+    month_end: date,
+    query_date: date,
+    payload: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    data_date = _parse_twse_date(payload.get("date")) or query_date
+    if data_date > month_end or data_date < month_end - timedelta(days=10):
+        return None
+    fields = [str(field).strip() for field in payload.get("fields") or []]
+    try:
+        symbol_index = fields.index("證券代號")
+        pe_index = fields.index("本益比")
+    except ValueError as exc:
+        raise ValueError("TWSE PE payload fields changed") from exc
+    for row in payload.get("data") or []:
+        if not isinstance(row, list) or symbol_index >= len(row):
+            continue
+        if _normalize_symbol(row[symbol_index]) != symbol:
+            continue
+        pe = parse_pe(row[pe_index] if pe_index < len(row) else None)
+        if pe is not None:
+            return {"date": data_date.isoformat(), "pe": pe}
     return None
 
 
@@ -276,27 +340,37 @@ def _build_twse_requester() -> RequestJson:
     return request_json
 
 
-def _write_cache(cache_path: Path, result: HistoricalPEResult) -> None:
+def _is_cacheable_daily_payload(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    status = str(payload.get("stat", "")).strip()
+    if "沒有符合條件" in status or "查無資料" in status:
+        return True
+    if status.upper() != "OK":
+        return False
+    fields = payload.get("fields")
+    data = payload.get("data")
+    return isinstance(fields, list) and isinstance(data, list) and "證券代號" in fields and "本益比" in fields
+
+
+def _write_daily_cache(cache_path: Path, query_date: str, payload: dict[str, Any]) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"cachedAt": datetime.now().isoformat(timespec="seconds"), "result": asdict(result)}
-    cache_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    cached_payload = {
+        "cachedAt": datetime.now().isoformat(timespec="seconds"),
+        "queryDate": query_date,
+        "payload": payload,
+    }
+    cache_path.write_text(json.dumps(cached_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _read_cache(cache_path: Path, symbol: str) -> Optional[HistoricalPEResult]:
+def _read_daily_cache(cache_path: Path, query_date: str) -> Optional[dict[str, Any]]:
     try:
-        payload = json.loads(cache_path.read_text(encoding="utf-8"))
-        result = payload.get("result") or {}
-        cached = HistoricalPEResult(**result)
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        cached = json.loads(cache_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, json.JSONDecodeError):
         return None
-    if cached.symbol != symbol or cached.validSampleCount <= 0:
+    if not isinstance(cached, dict) or cached.get("queryDate") != query_date:
         return None
-    validated = summarize_pe_samples(symbol, cached.samples)
-    if validated.validSampleCount != cached.validSampleCount:
+    payload = cached.get("payload")
+    if not _is_cacheable_daily_payload(payload):
         return None
-    return replace(
-        validated,
-        source=cached.source,
-        cacheStatus="cache",
-        dataLimitations=cached.dataLimitations,
-    )
+    return payload

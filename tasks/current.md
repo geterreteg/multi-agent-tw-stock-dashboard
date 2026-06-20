@@ -57,6 +57,8 @@ README、DEPLOYMENT 與 PRODUCT_PLAN 主要描述 Streamlit 架構；FastAPI / N
 
 ## 目前已知限制
 
+- TWSE 歷史 PE cache 已由單一股票 JSON 改為 `api/.cache/pe_history/daily/YYYYMMDD.json` 每日全市場 payload；同一日期的 TWSE 上市股票共用 `fields` / `data` rows。查詢會先同步掃描 daily cache，只把仍缺樣本的月份送入最多 5 個 workers，live budget 維持 6 秒、單次 request timeout 4 秒；TPEx 第一版仍明確不支援。
+- PR #2 Preview 與正式 `multi-agent-tw-stock-dashboard-next` bundle 目前都編譯為呼叫 `https://multi-agent-stock-api.onrender.com`。2026-06-20 實測該 production `/api/analyze` 對 2330 回 HTTP 200，但 top-level response 尚無 `historicalPE`，表示 Render production FastAPI 尚未部署 PR #2 的歷史 PE 契約；不是前端 mapping 問題。
 - FastAPI / Next.js 已新增 TWSE 上市股票歷史 PE：取最近 36 個已完成月份的月末 PE，月末無資料時往前最多 10 天。`/api/analyze` 會優先使用有效 JSON cache；無 cache 才以最多 5 workers、單次 request 4 秒、整體 6 秒上限 best-effort 抓取，單月失敗或整體逾時只將該月份列為 missing，不中止主分析。第一版不支援 TPEx。
 - 規則式估值區間只在 TTM EPS 且歷史 PE 有效樣本至少 12 筆時，使用 p25 / median / p75 作為 Bear / Base / Bull PE；樣本不足時才降級使用 currentPE 固定折溢價。
 - 目前 `main` 已包含 `f593ffc` 與後續文件提交。Render production FastAPI 與 Vercel Production API base 皆已升級，2330 / 8299 正式資料流驗收通過。
@@ -100,7 +102,7 @@ npm.cmd run build
 
 ## 目前待辦
 
-1. `main` 已包含第一版規則式 Target Price Engine、研究報告語氣、辯論室與 localStorage 決策筆記；PR #2 的歷史 PE Preview timeout 修正目前仍是工作區變更，尚未 commit、push、merge 或部署。
+1. 將 TWSE daily full-market PE cache 變更合併至 `main`，等待 Render production 自動部署後驗證 2330、另一檔 TWSE 與 8299；確認 `/api/analyze` 不超過前端 30 秒 timeout，且前端顯示歷史 PE 或明確降級原因。
 2. 目前 FinMind 財報一般 EPS 欄位只能保守辨識為單季 EPS。2330 實測因此回傳 `INSUFFICIENT_DATA`，未產生無法追溯的 12M 目標價。
 3. 未來若要讓 2330 等目前只有單季 EPS 的股票產生規則式估值區間，仍需加入可驗證的 forward / TTM EPS，或能明確區分單季與累計口徑的近四季 EPS；同業 PE、DCF 與法人一致性預估仍未納入。
 4. 確認 Streamlit legacy、FastAPI 與 Next.js 何者是未來正式主線，以及是否要讓 `app.py` 也改用官方籌碼資料。
