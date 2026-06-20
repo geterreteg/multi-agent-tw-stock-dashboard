@@ -179,8 +179,8 @@ function CachedAnalysisNotice({ onRetry }: { onRetry: () => void }) {
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-100" />
           <div>
-            <h2 className="text-base font-semibold">目前顯示最近一次成功分析</h2>
-            <p className="mt-1 text-sm leading-6 text-amber-100/75">資料可能不是最新；後端可能正在冷啟動，或外部資料來源暫時延遲。</p>
+            <h2 className="text-base font-semibold">目前顯示瀏覽器快取的最近一次成功分析</h2>
+            <p className="mt-1 text-sm leading-6 text-amber-100/75">本次 API 請求未成功，以下不是最新分析；後端可能正在冷啟動，或外部資料來源暫時延遲。</p>
           </div>
         </div>
         <Button variant="secondary" onClick={onRetry}>

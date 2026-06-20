@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import calendar
+import concurrent.futures
 import json
 import math
+import threading
+import time
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -14,7 +17,9 @@ import requests
 TWSE_PE_URL = "https://www.twse.com.tw/exchangeReport/BWIBBU_d"
 TWSE_PE_SOURCE = "TWSE 個股日本益比、殖利率及股價淨值比"
 DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "pe_history"
-REQUEST_TIMEOUT_SECONDS = 10
+REQUEST_TIMEOUT_SECONDS = 4
+OVERALL_TIMEOUT_SECONDS = 6
+MAX_WORKERS = 5
 RequestJson = Callable[[str], dict[str, Any]]
 
 
@@ -40,57 +45,71 @@ def get_historical_pe(
     months: int = 36,
     cache_path: Path | None = None,
     request_json: RequestJson | None = None,
+    overall_timeout_seconds: float = OVERALL_TIMEOUT_SECONDS,
+    max_workers: int = MAX_WORKERS,
 ) -> HistoricalPEResult:
     stock_id = _normalize_symbol(symbol)
     resolved_cache_path = cache_path or DEFAULT_CACHE_DIR / f"{stock_id}.json"
     if str(market or "").strip().upper() != "TWSE":
         return empty_historical_pe(stock_id, ["第一版歷史 PE 僅支援 TWSE 上市股票，尚不支援 TPEx。"])
 
-    requester = request_json or _build_twse_requester()
-    samples: list[dict[str, Any]] = []
-    missing_months = 0
-
-    try:
-        for month_end in _recent_completed_month_ends(reference_date or date.today(), months):
-            sample = _fetch_month_end_sample(stock_id, month_end, requester)
-            if sample is None:
-                missing_months += 1
-            else:
-                samples.append(sample)
-    except Exception as exc:
-        cached = _read_cache(resolved_cache_path, stock_id)
-        if cached is not None:
-            return replace(
-                cached,
-                cacheStatus="cache",
-                dataLimitations=[
-                    *cached.dataLimitations,
-                    f"TWSE 讀取失敗（{type(exc).__name__}），本次改用上次成功快取。",
-                ],
-            )
-        return empty_historical_pe(
-            stock_id,
-            [f"TWSE 歷史 PE 讀取失敗（{type(exc).__name__}），且無可用快取。"],
+    cached = _read_cache(resolved_cache_path, stock_id)
+    if cached is not None:
+        return replace(
+            cached,
+            cacheStatus="cache",
+            dataLimitations=[*cached.dataLimitations, "本次優先使用有效歷史 PE JSON 快取，未同步重抓 TWSE。"],
         )
 
+    requester = request_json or _build_twse_requester()
+    samples: list[dict[str, Any]] = []
+    month_ends = _recent_completed_month_ends(reference_date or date.today(), months)
+    deadline = time.monotonic() + max(0, overall_timeout_seconds)
+    timed_out = False
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(month_ends) or 1)))
+    futures: dict[concurrent.futures.Future[Optional[dict[str, Any]]], date] = {}
+    try:
+        futures = {
+            executor.submit(_fetch_month_end_sample, stock_id, month_end, requester, deadline): month_end
+            for month_end in month_ends
+        }
+        done, not_done = concurrent.futures.wait(futures, timeout=max(0, overall_timeout_seconds))
+        timed_out = bool(not_done)
+        for future in done:
+            try:
+                sample = future.result()
+            except Exception:
+                sample = None
+            if sample is not None:
+                samples.append(sample)
+        for future in not_done:
+            future.cancel()
+    except Exception as exc:
+        return empty_historical_pe(
+            stock_id,
+            [f"TWSE 歷史 PE best-effort 讀取失敗（{type(exc).__name__}），且無可用快取；不影響主分析。"],
+        )
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
     result = summarize_pe_samples(stock_id, samples)
-    if result.validSampleCount == 0:
-        cached = _read_cache(resolved_cache_path, stock_id)
-        if cached is not None:
-            return replace(
-                cached,
-                cacheStatus="cache",
-                dataLimitations=[*cached.dataLimitations, "TWSE 本次未取得可用 PE 樣本，改用上次成功快取。"],
-            )
     limitations = [
         "歷史 PE 取自 TWSE 每日本益比資料，以最近 36 個已完成月份的月末或往前最多 10 天交易日為樣本。",
         "TWSE 資料可能延遲、缺漏或調整欄位格式；歷史區間不代表未來合理估值。",
     ]
+    missing_months = max(0, len(month_ends) - result.validSampleCount)
     if missing_months:
         limitations.append(f"{missing_months} 個月份在月末往前 10 天內無可用 PE 樣本。")
+    if timed_out:
+        limitations.append(f"TWSE live 抓取已達 {overall_timeout_seconds:g} 秒整體時間上限，未完成月份視為 missing；不影響主分析。")
+    if result.validSampleCount == 0:
+        limitations.append("TWSE live 抓取未取得可用歷史 PE，且無有效快取；主分析仍可繼續。")
     result = replace(result, dataLimitations=limitations)
     if result.validSampleCount > 0:
-        _write_cache(resolved_cache_path, result)
+        try:
+            _write_cache(resolved_cache_path, result)
+        except OSError:
+            result = replace(result, dataLimitations=[*result.dataLimitations, "歷史 PE cache 寫入失敗；不影響本次主分析。"])
     return result
 
 
@@ -149,8 +168,15 @@ def empty_historical_pe(symbol: str, limitations: list[str] | None = None) -> Hi
     )
 
 
-def _fetch_month_end_sample(symbol: str, month_end: date, request_json: RequestJson) -> Optional[dict[str, Any]]:
+def _fetch_month_end_sample(
+    symbol: str,
+    month_end: date,
+    request_json: RequestJson,
+    deadline: float = math.inf,
+) -> Optional[dict[str, Any]]:
     for days_back in range(11):
+        if time.monotonic() >= deadline:
+            return None
         query_date = month_end - timedelta(days=days_back)
         payload = request_json(query_date.strftime("%Y%m%d"))
         if str(payload.get("stat", "")).upper() != "OK":
@@ -222,8 +248,7 @@ def _parse_twse_date(value: Any) -> Optional[date]:
 
 
 def _build_twse_requester() -> RequestJson:
-    session = requests.Session()
-    session.trust_env = False
+    thread_local = threading.local()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36",
         "Accept": "application/json,text/plain,*/*",
@@ -231,6 +256,11 @@ def _build_twse_requester() -> RequestJson:
     }
 
     def request_json(query_date: str) -> dict[str, Any]:
+        session = getattr(thread_local, "session", None)
+        if session is None:
+            session = requests.Session()
+            session.trust_env = False
+            thread_local.session = session
         response = session.get(
             TWSE_PE_URL,
             params={"date": query_date, "selectType": "ALL", "response": "json"},
@@ -261,4 +291,12 @@ def _read_cache(cache_path: Path, symbol: str) -> Optional[HistoricalPEResult]:
         return None
     if cached.symbol != symbol or cached.validSampleCount <= 0:
         return None
-    return cached
+    validated = summarize_pe_samples(symbol, cached.samples)
+    if validated.validSampleCount != cached.validSampleCount:
+        return None
+    return replace(
+        validated,
+        source=cached.source,
+        cacheStatus="cache",
+        dataLimitations=cached.dataLimitations,
+    )

@@ -1,5 +1,16 @@
 # 專案交接紀錄
 
+## 2026-06-20 PR #2 Preview 歷史 PE timeout 修正
+
+- 根因是 `build_context()` 在 `/api/analyze` 主流程同步執行 36 個月份的 TWSE crawl；舊實作只在 live 失敗後讀 cache，且每月最多串行 11 次、單次 timeout 10 秒，理論上可累積 396 次 request，直接超過前端 30 秒 timeout。
+- `get_historical_pe()` 已改為 cache-first；有效 JSON cache 直接以 `cacheStatus=cache` 回傳，不同步重抓 TWSE。cache 會從 samples 重新驗證統計與有效筆數。
+- 無 cache 時以最多 5 workers 有限平行化；單次 TWSE request timeout 4 秒、整體 live deadline 6 秒。保留每月往前 10 天邏輯；單月 exception、單月 missing、整體 timeout 或 cache 寫入失敗都只降級 historicalPE，不中止主分析。
+- `analysis.py` 增加最後一道 best-effort 防護；任何歷史 PE 非預期例外都回 `cacheStatus=missing` 與明確 `dataLimitations`。前端 localStorage fallback 提示明確標示為瀏覽器快取，不冒充最新 API 分析。
+- 本機 HTTP：2330 `/api/analyze` 200 / 5.03 秒，top-level historicalPE 為 cache / 36 筆，min=14.04、p25=19.84、median=23.82、p75=26.88、max=32.23；EPS basis 仍為 SINGLE_QUARTER，沒有 Bear / Base / Bull。
+- 本機 HTTP：8299 `/api/analyze` 200 / 4.84 秒，historicalPE 為 missing / 0 筆，明確說明第一版尚不支援 TPEx；頁面正常顯示資料不足。
+- 驗證：FastAPI unittest 47/47、Python compileall、TypeScript、Next.js production build、`git diff --check` 通過；Browser 驗證 2330 / 8299「基本面 / 估值」tab 無 framework overlay、console warning/error，並取得畫面證據。
+- 本次只修改歷史 PE、analysis 防護、測試、既有快取提示與 tasks 狀態文件；未修改 secrets、環境變數、部署設定或套件版本，仍未 commit、push、merge、deploy。
+
 ## 2026-06-20 TWSE 歷史 PE 區間
 
 - 新增 `api/app/services/pe_history.py`，第一版僅支援 TWSE 上市股票；使用 TWSE `BWIBBU_d` 每日本益比資料，取最近 36 個已完成月份的月末 PE，並在無可用值時往前最多回溯 10 天。

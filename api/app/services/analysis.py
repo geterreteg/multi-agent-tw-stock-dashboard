@@ -93,7 +93,7 @@ def build_context(symbol: str, period: str = "6mo") -> StockContext:
     market = infer_market_from_price_status(price_status)
     chip_data = build_chip_data(stock_id, market)
     chip_metrics = chip_metrics_from_data(chip_data)
-    historical_pe = get_historical_pe(stock_id, market=market)
+    historical_pe = get_historical_pe_best_effort(stock_id, market)
 
     return StockContext(
         stock_id=stock_id,
@@ -335,6 +335,16 @@ def chip_data_to_model(chip_data: dict) -> ChipData:
         margin=MarginData(**(chip_data.get("margin") or {})),
         dataGaps=chip_data.get("dataGaps") or [],
     )
+
+
+def get_historical_pe_best_effort(symbol: str, market: str | None) -> HistoricalPEResult:
+    try:
+        return get_historical_pe(symbol, market=market)
+    except Exception as exc:
+        return empty_historical_pe(
+            symbol,
+            [f"歷史 PE 發生非預期錯誤（{type(exc).__name__}），已略過且不影響主分析。"],
+        )
 
 
 def historical_pe_to_model(result: HistoricalPEResult) -> HistoricalPE:

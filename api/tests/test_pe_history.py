@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
+from app.services.analysis import get_historical_pe_best_effort
 from app.services.pe_history import (
     get_historical_pe,
     parse_pe,
@@ -65,8 +68,8 @@ class PeHistoryCacheTests(unittest.TestCase):
 
         self.assertEqual(36, result.validSampleCount)
         self.assertEqual(36, len(calls))
-        self.assertEqual("20250228", calls[0])
-        self.assertEqual("20220331", calls[-1])
+        self.assertIn("20250228", calls)
+        self.assertIn("20220331", calls)
 
     def test_tpex_is_explicitly_unavailable_without_twse_request(self) -> None:
         calls: list[str] = []
@@ -183,6 +186,104 @@ class PeHistoryCacheTests(unittest.TestCase):
         self.assertEqual("cache", cached.cacheStatus)
         self.assertEqual(20, cached.medianPE)
         self.assertTrue(any("快取" in item for item in cached.dataLimitations))
+
+    def test_single_month_failure_does_not_abort_other_months(self) -> None:
+        def request_json(query_date: str) -> dict:
+            if query_date.startswith("202502"):
+                raise ConnectionError("one month failed")
+            return {
+                "stat": "OK",
+                "date": query_date,
+                "fields": ["證券代號", "本益比"],
+                "data": [["2330", "20"]],
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = get_historical_pe(
+                "2330",
+                market="TWSE",
+                reference_date=date(2025, 3, 15),
+                months=2,
+                cache_path=Path(temp_dir) / "2330.json",
+                request_json=request_json,
+            )
+
+        self.assertEqual("live", result.cacheStatus)
+        self.assertEqual(1, result.validSampleCount)
+        self.assertTrue(any("1 個月份" in item for item in result.dataLimitations))
+
+    def test_all_live_requests_fail_without_cache_returns_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = get_historical_pe(
+                "2330",
+                market="TWSE",
+                reference_date=date(2025, 3, 15),
+                months=2,
+                cache_path=Path(temp_dir) / "2330.json",
+                request_json=lambda _: (_ for _ in ()).throw(ConnectionError("TWSE unavailable")),
+            )
+
+        self.assertEqual("missing", result.cacheStatus)
+        self.assertEqual(0, result.validSampleCount)
+        self.assertTrue(any("無可用" in item for item in result.dataLimitations))
+
+    def test_valid_cache_is_returned_without_live_request(self) -> None:
+        calls: list[str] = []
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "2330.json"
+            get_historical_pe(
+                "2330",
+                market="TWSE",
+                reference_date=date(2025, 3, 15),
+                months=1,
+                cache_path=cache_path,
+                request_json=lambda query_date: {
+                    "stat": "OK",
+                    "date": query_date,
+                    "fields": ["證券代號", "本益比"],
+                    "data": [["2330", "20"]],
+                },
+            )
+            result = get_historical_pe(
+                "2330",
+                market="TWSE",
+                cache_path=cache_path,
+                request_json=lambda query_date: calls.append(query_date) or {},
+            )
+
+        self.assertEqual("cache", result.cacheStatus)
+        self.assertEqual(1, result.validSampleCount)
+        self.assertEqual([], calls)
+
+    def test_slow_live_requests_respect_overall_deadline(self) -> None:
+        def slow_request(_: str) -> dict:
+            time.sleep(0.2)
+            return {"stat": "很抱歉，沒有符合條件的資料!"}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            started = time.monotonic()
+            result = get_historical_pe(
+                "2330",
+                market="TWSE",
+                reference_date=date(2025, 3, 15),
+                months=36,
+                cache_path=Path(temp_dir) / "2330.json",
+                request_json=slow_request,
+                overall_timeout_seconds=0.05,
+            )
+            elapsed = time.monotonic() - started
+
+        self.assertLess(elapsed, 0.15)
+        self.assertEqual("missing", result.cacheStatus)
+        self.assertTrue(any("時間上限" in item for item in result.dataLimitations))
+
+    def test_analysis_boundary_degrades_unexpected_historical_pe_error(self) -> None:
+        with patch("app.services.analysis.get_historical_pe", side_effect=RuntimeError("unexpected")):
+            result = get_historical_pe_best_effort("2330", "TWSE")
+
+        self.assertEqual("missing", result.cacheStatus)
+        self.assertTrue(any("不影響主分析" in item for item in result.dataLimitations))
 
 
 if __name__ == "__main__":

@@ -239,6 +239,8 @@ class TargetPriceApiTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             models.TargetPrice(unexpectedField=1)
         with self.assertRaises(ValidationError):
+            models.HistoricalPE(historicalPeMedian=20)
+        with self.assertRaises(ValidationError):
             models.HistoricalPE(peHistory={})
 
     def test_insufficient_target_price_does_not_change_rating(self) -> None:
