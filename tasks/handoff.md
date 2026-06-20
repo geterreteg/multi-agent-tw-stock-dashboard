@@ -1,5 +1,24 @@
 # 專案交接紀錄
 
+## 2026-06-20 TWSE 每日全市場 PE cache
+
+- `api/app/services/pe_history.py` 已由 `api/.cache/pe_history/<symbol>.json` 改為 `api/.cache/pe_history/daily/YYYYMMDD.json`；每個 daily cache 保存 TWSE 該日完整 `fields` / `data` payload，不含股票特判，所有 TWSE 上市股票可共用。
+- 查詢最近 36 個已完成月份時，先同步掃描各月份月末往前 10 天的 daily cache；只有仍缺樣本的月份才進入最多 5 workers 的 live 階段。live 整體 budget 6 秒、單次 request timeout 4 秒，cache 讀取不受 live deadline 阻斷。
+- 已完成月份的明確「沒有符合條件 / 查無資料」回應可負向快取；暫時性或矛盾的 TWSE 錯誤不寫 cache。cache 寫入失敗、單月失敗或整體 timeout 都只加入 `dataLimitations`，不影響主分析 HTTP 200。
+- 本機冷啟動 2330：HTTP 200 / 7.15 秒，36 筆；2317：HTTP 200 / 4.80 秒，36 筆；8299：HTTP 200 / 5.41 秒，0 筆、`missing`，明確說明第一版不支援 TPEx。cache 建立後 2330 / 2317 都以 `cacheStatus=cache` 回 36 筆。
+- 2330 / 2317 的 EPS basis 都是 `SINGLE_QUARTER`，因此即使歷史 PE 有 36 筆，Bear / Base / Bull 仍為 null；API case-sensitive key 僅有 top-level `historicalPE`。
+- 驗證：FastAPI unittest 50/50、Python compileall、TypeScript、Next.js production build、`git diff --check` 通過。Render production 部署與遠端 E2E 待本次變更合併後執行。
+
+## 2026-06-20 PR #2 Preview API routing 診斷
+
+- `next-dashboard/lib/api.ts` 從 build-time `NEXT_PUBLIC_API_BASE_URL` 取得 origin，再附加 `/api/analyze`；本機 `.env.local` 與 `.env.example` 都是 `http://127.0.0.1:8000`，不代表 Vercel Preview 平台值。
+- PR #2 的 `multi-agent-tw-stock-dashboard-next` Preview deployment 是 `dpl_97Xi1KpbXUbFnwQXgaM3hNyjQoa1`，alias 為 `https://multi-agent-tw-stock-dashbo-git-24f377-geter2211-3152s-projects.vercel.app`。受保護 Preview 的 stock page bundle `page-66dc6a193f317689.js` 編譯 origin 為 `https://multi-agent-stock-api.onrender.com`，所以實際 analyze Request URL 是 `https://multi-agent-stock-api.onrender.com/api/analyze`。
+- 正式 `https://multi-agent-tw-stock-dashboard-next.vercel.app` 的 stock page bundle 也編譯同一 production backend origin，Preview 並未指向 staging 或錯誤 API base。
+- 本機 FastAPI 2330 `/api/analyze`：HTTP 200 / 3.81 秒，top-level `historicalPE` 存在，cache / 36 筆。
+- 遠端 production FastAPI 2330 `/api/analyze`：HTTP 200 / 8.18 秒，top-level 欄位沒有 `historicalPE`；也沒有 `historicalPe`、`peHistory` 或 `historical_pe` 等錯誤別名。`multi-agent-stock-api-staging.onrender.com` 本輪另測為 60 秒逾時，但 Preview 未指向 staging。
+- 根因是 Render production `multi-agent-stock-api` 尚未部署包含 PR #2 historicalPE 契約的後端版本，不是前端 mapping bug，也不是 Preview API base URL 指錯。前端 `AnalyzeResponse.historicalPE` 與 `TargetPricePanel historicalPE={data.historicalPE}` wiring 已存在。
+- 最小修正是由平台管理者在 Render 的 `multi-agent-stock-api` 手動部署包含 PR #2 後端變更的 commit，再直接驗證 production `/api/analyze` 有 top-level `historicalPE`，最後重測受保護 Preview。不要改 Vercel env；目前 backend origin 值正確。本次未改 application code、secrets、環境變數或部署設定，也未 merge / deploy。
+
 ## 2026-06-20 PR #2 Preview 歷史 PE timeout 修正
 
 - 根因是 `build_context()` 在 `/api/analyze` 主流程同步執行 36 個月份的 TWSE crawl；舊實作只在 live 失敗後讀 cache，且每月最多串行 11 次、單次 timeout 10 秒，理論上可累積 396 次 request，直接超過前端 30 秒 timeout。
