@@ -8,8 +8,6 @@
 
 新版正式前端：`https://multi-agent-tw-stock-dashboard-next.vercel.app`
 
-後端 FastAPI production origin：`https://multi-agent-stock-api.onrender.com`
-
 完整使用說明請見 `USER_GUIDE.md`。
 
 ## 主要功能
